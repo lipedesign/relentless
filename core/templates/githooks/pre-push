@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Relentless pre-push — refuse updates to main/master and any non-fast-forward (force) push.
+# Installed into the consumer repo by core/scripts/install-githooks.sh.
+set -euo pipefail
+
+payload="$(cat || true)"  # intentional: empty stdin ok
+zero="0000000000000000000000000000000000000000"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [[ -n "${remote_ref:-}" ]] || continue
+  case "$remote_ref" in
+    refs/heads/main|refs/heads/master)
+      echo "relentless: refusing push to ${remote_ref}." >&2
+      echo "Push a feature branch and open a pull request." >&2
+      exit 1
+      ;;
+  esac
+  if [[ "$local_sha" != "$zero" && "$remote_sha" != "$zero" ]]; then
+    if ! git merge-base --is-ancestor "$remote_sha" "$local_sha"; then
+      echo "relentless: refusing force-push of ${remote_ref} (not a fast-forward)." >&2
+      echo "This includes --force, --force-with-lease, and a +refspec." >&2
+      exit 1
+    fi
+  fi
+done <<<"${payload}"
+
+legacy="$(git rev-parse --git-common-dir)/hooks/pre-push"
+self="$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || echo "$0")"
+legacy_abs="$(readlink -f "$legacy" 2>/dev/null || realpath "$legacy" 2>/dev/null || echo "$legacy")"
+if [[ -x "$legacy" && "$legacy_abs" != "$self" ]]; then
+  "$legacy" "$@" <<<"${payload}"
+fi

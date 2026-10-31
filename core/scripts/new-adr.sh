@@ -4,6 +4,7 @@
 #   new-adr.sh --workdir PATH --title "Title" --slug slug [--issue N] [--status proposed] [--dry-run]
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKDIR="." TITLE="" SLUG="" ISSUE="" STATUS="proposed" DRY=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -20,6 +21,16 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 [[ -n "$TITLE" && -n "$SLUG" ]] || { echo "need --title --slug" >&2; exit 2; }
+
+STATUS_LC="$(printf '%s' "$STATUS" | tr '[:upper:]' '[:lower:]')"
+if [[ "$STATUS_LC" == "accepted" ]]; then
+  # shellcheck source=lib/human-decision.sh
+  source "${SCRIPT_DIR}/lib/human-decision.sh"
+  EXACT="${SCRIPT_DIR}/decide.sh --repo OWNER/NAME --issue ${ISSUE:-N} --option K --adr docs/decisions/adr/NNNN-$(printf '%q' "$SLUG").md"
+  relentless_refuse_if_agent "new-adr.sh --status accepted" "$EXACT"
+  relentless_confirm_on_tty "new-adr.sh --status accepted" "$EXACT" "Create ADR \"${TITLE}\" with Status accepted? Agents must leave ADRs proposed."
+  STATUS="accepted"
+fi
 
 WORKDIR="$(cd "$WORKDIR" && pwd)"
 ADR_DIR="${WORKDIR}/docs/decisions/adr"

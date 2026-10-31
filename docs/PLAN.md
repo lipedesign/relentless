@@ -218,3 +218,10 @@ Shipped against §1 inventory:
 | PR14 | Follow-ups after review | yes — `follow-up-after-review.md` |
 | PR15 | Status snapshot | yes — template + `write-status-snapshot.sh` |
 | Hooks | stop-gate / protect-main / protect-worktree-write | yes |
+
+## 14. v1.4.1 hook and decision guards (2026-10-31)
+
+- PreToolUse protect-main blocks every force-push spelling and commits aimed at main via `git -C` or `cd`.
+- `tests/hooks/` regression harness; CI runs it.
+- Setup installs consumer `pre-commit` / `pre-push` via `core.hooksPath` (chains husky, does not clobber). GitHub branch protection stays opt-in.
+- Human decisions: agents cannot run `decide.sh` / `accept-adr.sh`; Claude UserPromptSubmit records a typed `/decide`; Codex refuses without a TTY and tells the decider the exact terminal command. `merge-if-ready` refuses an accepted ADR with no decision-request comment.

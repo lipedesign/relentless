@@ -53,8 +53,29 @@ gh auth refresh -s workflow
 | **AGENTS.md / CLAUDE.md** | Upserts a `<!-- relentless:start -->` … `<!-- relentless:end -->` block (idempotent; does not skip existing files) |
 | **Issue forms** | `relentless.yml`, `investigation.yml`, **`epic.yml`**, `config.yml` with `blank_issues_enabled: false` |
 | **Labels** | Idempotent create/edit |
+| **Git hooks** | `.relentless/githooks/pre-commit` and `pre-push`. Sets `core.hooksPath` to that directory, or chains an existing hooksPath / husky without replacing it. Refuses commits on `main`/`master`, pushes to `main`/`master`, and non-fast-forward (force) pushes. |
+| **Branch protection** | **Off** unless you pass `--branch-protection` after an explicit yes in setup. Fail-soft if the token cannot admin the repo. |
 
 Setup then commits seeds on `chore/relentless-setup` and opens a PR (empty repos may seed `main` first).
+
+### Human decisions
+
+Agents use the same GitHub account as the decider, so they must not record decisions themselves.
+
+- Do not run `/decide`, `decide.sh`, or `accept-adr.sh`, and do not write `Decided by`. New ADRs stay **proposed**.
+- **Claude:** typing `/decide <issue> <option>` is handled by the UserPromptSubmit hook, which records the decision.
+- **Codex:** commands have no TTY, even in the interactive TUI. `decide.sh` refuses and prints the exact command. That refusal is expected. The decider runs it in their own terminal, outside the agent session. With the sandbox disabled, a process that can open its own terminal lowers but does not eliminate the risk.
+- If an issue is `human:pending`, post the decision request, tell the decider (`decider.name` in `.relentless/config.json`) that command, and move on. Do not retry.
+
+### Hook tests
+
+```bash
+bash tests/hooks/test-hooks.sh
+bash tests/hooks/test-decide-guard.sh
+bash tests/hooks/test-githooks.sh
+```
+
+CI runs the same three scripts (`.github/workflows/ci.yml`).
 
 ## Quick start after setup
 

@@ -1,4 +1,9 @@
 name = "implementer"
 description = "Implement AC in own worktree; stop at state:review. Never self-review/merge. Full brief: agents/implementer.md"
-# Launch notes: see docs/harness-profiles.md and agents/implementer.md
-# Codex has no Stop hooks — honor stop-gate / protect-main / worktree rules as instructions.
+developer_instructions = """
+Do not run /decide, decide.sh, or accept-adr.sh. Do not write Decided by. Create ADRs only as proposed.
+If the issue has human:pending, post the decision request, tell the decider (decider.name from .relentless/config.json, not a hardcoded person) the exact command to run in their own terminal (core/scripts/decide.sh --repo OWNER/NAME --issue N --option K), and move on to another ready issue.
+A decide.sh refusal is expected, not an error to work around. Do not retry or try other routes.
+"Do not stall for a human" applies to agent handoffs, not to human decisions.
+Codex commands have no TTY, even in the interactive TUI. The human cannot confirm /decide inside this session.
+"""

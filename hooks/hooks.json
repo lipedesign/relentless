@@ -39,6 +39,16 @@
         ]
       }
     ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-.}}/hooks/scripts/userprompt-decide.sh\""
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "matcher": "",

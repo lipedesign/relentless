@@ -74,7 +74,7 @@ export RELENTLESS_ROOT="<installPath>"
 
 # Codex — prefer cache path, not .tmp marketplaces clone
 # ~/.codex/plugins/cache/relentless/relentless/<version>/
-export RELENTLESS_ROOT=~/.codex/plugins/cache/relentless/relentless/1.4.0
+export RELENTLESS_ROOT=~/.codex/plugins/cache/relentless/relentless/1.4.1
 ```
 
 ## Project-scoped plugin install
@@ -85,3 +85,37 @@ export RELENTLESS_ROOT=~/.codex/plugins/cache/relentless/relentless/1.4.0
 | Codex CLI 0.165.x | **No** equivalent flag on `codex plugin add` | Plugins live in user `~/.codex/config.toml`. Each collaborator installs. Do not invent a project install. |
 
 Bootstrap `--harness claude|codex|both` (default `both`) only seeds `.codex/agents/*.toml` stubs when Codex is in use; it never vendors Claude `agents/`/`skills/`. Prefer **`/relentless:setup`** / skill `setup` for the full interactive consumer prep.
+
+## Human decisions
+
+Agents share the human's GitHub identity. There is no marker file or env token that proves a human (the agent could write it).
+
+- **Claude:** typing `/decide <issue> <option>` runs `hooks/scripts/userprompt-decide.sh` (UserPromptSubmit). The hook records the decision. The agent does not call `decide.sh`.
+- **Codex:** commands have no TTY, even in the interactive TUI, so the human cannot confirm `/decide` from inside a Codex session. `decide.sh` and `accept-adr.sh` refuse and print the exact command. That refusal is expected behavior, not a broken lock. Do not retry or try another route. The decider runs it in their own terminal, outside the agent session:
+
+```bash
+core/scripts/decide.sh --repo OWNER/NAME --issue N --option K
+```
+
+With the sandbox disabled, a process that allocates its own terminal lowers but does not eliminate the risk. `merge-if-ready` also refuses a PR that adds or changes an **accepted** ADR when the linked issue has no `<!-- relentless:decision-request -->` comment.
+
+If the issue has `human:pending`, post the decision request, tell the decider (`decider.name` from config, not a hardcoded person) that command, and move on to another ready issue.
+
+## Git hooks in the consumer repo
+
+Setup / `bootstrap.sh` installs `.relentless/githooks/pre-commit` and `pre-push`:
+
+- Unset `core.hooksPath` → set it to `.relentless/githooks`. An existing executable `.git/hooks/pre-commit` or `pre-push` is still chained.
+- Existing `core.hooksPath` (husky or otherwise) → left unchanged; the hook files gain one `# relentless:githooks` chain call. Re-running does not duplicate it.
+- They refuse commits on `main`/`master`, pushes that update `refs/heads/main` or `refs/heads/master`, and non-fast-forward pushes. The pre-push hook sees the old and new SHAs, not the `--force` flag, so a fast-forward update is allowed even if the client passed `--force`. The agent PreToolUse hook still blocks every force-push spelling (`-f`, `--force`, `--force-with-lease`, `+refspec`) before git runs.
+- GitHub branch protection on main is **not** enabled by default. Setup asks; pass `--branch-protection` only after an explicit yes (fail-soft).
+
+## Hook regression tests
+
+```bash
+bash tests/hooks/test-hooks.sh          # PreToolUse protect-main, reviewer isolation, decide block
+bash tests/hooks/test-decide-guard.sh   # agent refusal, forged env, human PTY, UserPromptSubmit, merge ADR guard
+bash tests/hooks/test-githooks.sh       # core.hooksPath install, husky chain, main and force-push
+```
+
+CI (`.github/workflows/ci.yml`) runs the same scripts.
