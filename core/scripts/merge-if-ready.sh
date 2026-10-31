@@ -210,15 +210,15 @@ wait_ci() {
       return 1
     fi
     if echo "$out" | grep -qiE 'no checks reported'; then
-      echo "CI: no checks yet (try $((tries+1))/$max) — prefer: gh run list --branch … && gh run watch"
+      echo "CI: pending (try $((tries+1))/$max) — no checks yet; this poll stays in the foreground"
     else
       echo "CI: pending (try $((tries+1))/$max)"
     fi
     sleep "$sleep_s"
     tries=$((tries + 1))
   done
-  echo "error: CI did not go green in time" >&2
-  return 1
+  echo "CI: pending — checks not green yet. Re-run merge-if-ready.sh in the foreground on the next step (exit 3)." >&2
+  return 3
 }
 
 # Retarget open PRs whose base is HEAD_REF onto new_base. Returns 1 if any remain.

@@ -20,7 +20,7 @@ description: Implement issue AC in its own git worktree from origin/main on <typ
 - Move issue `state:todo` → `state:in-progress` via `set-state.sh`; assign worker.
 - Implement against acceptance criteria; open PR linked with `Closes #N`.
 - On ambiguity: **human-gate** (and ADR if durable).
-- Wait CI with `wait-ci.sh` / `gh run watch`.
+- Wait for CI in the foreground with `wait-ci.sh` (re-run it if pending). Do not background it or use `gh run watch`.
 - Fill QA (or hand off to qa) via `fill-qa-section.sh`.
 - Set `state:review` and **STOP**. Do **not** spawn reviewer, apply `review:approved`, or merge.
 

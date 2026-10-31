@@ -43,10 +43,19 @@ core/scripts/run-isolated-review.sh --repo OWNER/NAME --pr N --issue N \
 
 ### Implementer / orchestrator
 ```bash
-claude -p --dangerously-skip-permissions < orchestrator-prompt.md
+# 0 disables the print-mode background-task ceiling (default is 10 minutes).
+CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
+  claude -p --dangerously-skip-permissions < orchestrator-prompt.md
 # Live logs — stream-json REQUIRES --verbose on Claude Code 2.1.x+:
-claude -p --verbose --output-format stream-json --dangerously-skip-permissions < orchestrator-prompt.md
+CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
+  claude -p --verbose --output-format stream-json --dangerously-skip-permissions < orchestrator-prompt.md
 ```
+
+### Headless / print mode (`claude -p`)
+
+After the model ends a turn, print mode waits for background tasks and then stops the session. The default ceiling is `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` (10 minutes). The process prints `Background tasks still running … stopping them` and dies, so a dogfood wave needs a manual continue. Set `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` to disable that ceiling, or set a high millisecond value to raise it.
+
+Disabling the ceiling is a backstop. CI and reviewer waits still run in the foreground: `wait-ci.sh` polls and exits 3 with `CI: pending` when its budget is spent, and the next step runs it again. `run-isolated-review.sh` blocks until the reviewer exits. Do not background those commands, and do not use `gh run watch` or `run_in_background` for them — a watcher stays alive after the turn and is what trips the ceiling.
 
 ### Reviewer (restricted tools)
 ```bash

@@ -54,6 +54,7 @@ VERDICT_RAW="${OUT_DIR}/reviewer-out.md"
 VERDICT_FILE="${OUT_DIR}/verdict.txt"
 
 echo "== isolated review (harness=$HARNESS) PR #$PR issue #$ISSUE =="
+echo "foreground: reviewer runs in this process until it exits; do not background it"
 
 "${SCRIPT_DIR}/build-review-bundle.sh" --repo "$REPO" --pr "$PR" --issue "$ISSUE" --out "$BUNDLE"
 echo "bundle: $BUNDLE ($(wc -c <"$BUNDLE") bytes)"
