@@ -1,2 +1,4 @@
 name = "qa"
-description = "Dogfood the workflow; verify acceptance criteria; file gaps."
+description = "Dogfood QA section owner. Full brief: agents/qa.md"
+# Launch notes: see docs/harness-profiles.md and agents/qa.md
+# Codex has no Stop hooks — honor stop-gate / protect-main / worktree rules as instructions.

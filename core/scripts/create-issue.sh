@@ -67,7 +67,7 @@ MS_ARGS=()
 if [[ -n "$MILESTONE" ]]; then
   MS_TITLE=""
   if [[ "$MILESTONE" =~ ^[0-9]+$ ]]; then
-    MS_TITLE="$(gh api "repos/${REPO}/milestones/${MILESTONE}" --jq .title 2>/dev/null || true)"
+    MS_TITLE="$(gh api "repos/${REPO}/milestones/${MILESTONE}" --jq .title 2>/dev/null || true)"  # intentional fail-soft
     [[ -n "$MS_TITLE" ]] || { echo "error: milestone number $MILESTONE not found in $REPO" >&2; exit 1; }
     echo "milestone: #$MILESTONE → \"$MS_TITLE\""
   else

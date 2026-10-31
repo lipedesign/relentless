@@ -87,3 +87,9 @@ docs/                              harness profiles, deferred, PLAN
 ## License
 
 MIT
+
+## Decision records & worktrees
+
+- Durable choices live in `docs/decisions/` (ADR = human gate via `/decide`; notes = no gate). Agents read them before plan/implement.
+- Each implementer works in its own git worktree (`skills/worktree-segura`, `worktree-create.sh`) on `<type>/<n>-<slug>` from `origin/main`.
+

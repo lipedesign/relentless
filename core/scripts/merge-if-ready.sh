@@ -14,29 +14,30 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/common.sh
 source "${SCRIPT_DIR}/lib/common.sh"
 
-REPO="" PR="" ISSUE="" CONFIG="" DRY=0
+REPO="" PR="" ISSUE="" CONFIG="" DRY=0 CLEANUP_WT=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --repo) REPO="${2:-}"; shift 2 ;;
     --pr) PR="${2:-}"; shift 2 ;;
     --issue) ISSUE="${2:-}"; shift 2 ;;
     --config) CONFIG="${2:-}"; shift 2 ;;
+    --cleanup-worktree) CLEANUP_WT="${2:-}"; shift 2 ;;
     --dry-run) DRY=1; shift ;;
     -h|--help)
-      echo "Usage: $(basename "$0") --repo OWNER/NAME --pr N [--issue N] [--config PATH] [--dry-run]"
+      echo "Usage: $(basename "$0") --repo OWNER/NAME --pr N [--issue N] [--config PATH] [--cleanup-worktree PATH] [--dry-run]"
       exit 0 ;;
     *) echo "Unknown: $1" >&2; exit 2 ;;
   esac
 done
 [[ -n "$REPO" && -n "$PR" ]] || { echo "need --repo --pr" >&2; exit 2; }
 
-RESOLVED="$(resolve_config "${CONFIG:-.relentless/config.json}" "$REPO" || true)"
+RESOLVED="$(resolve_config "${CONFIG:-.relentless/config.json}" "$REPO" || true)"  # intentional fail-soft
 CONFIG="${RESOLVED:-}"
 
 if [[ -z "$ISSUE" ]]; then
-  ISSUE="$(gh pr view "$PR" --repo "$REPO" --json closingIssuesReferences -q '.closingIssuesReferences[0].number // empty' 2>/dev/null || true)"
+  ISSUE="$(gh pr view "$PR" --repo "$REPO" --json closingIssuesReferences -q '.closingIssuesReferences[0].number // empty' 2>/dev/null || true)"  # intentional fail-soft
   if [[ -z "$ISSUE" ]]; then
-    ISSUE="$(gh pr view "$PR" --repo "$REPO" --json body -q .body | grep -oiE 'closes[[:space:]]+#([0-9]+)' | head -1 | grep -oE '[0-9]+' || true)"
+    ISSUE="$(gh pr view "$PR" --repo "$REPO" --json body -q .body | grep -oiE 'closes[[:space:]]+#([0-9]+)' | head -1 | grep -oE '[0-9]+' || true)"  # intentional fail-soft
   fi
 fi
 [[ -n "$ISSUE" ]] || { echo "error: could not resolve linked issue; pass --issue N" >&2; exit 1; }
@@ -91,7 +92,7 @@ wait_ci() {
 retarget_dependents() {
   local head="$1" new_base="$2"
   local deps dep_num failed=0
-  deps="$(gh pr list --repo "$REPO" --state open --base "$head" --json number -q '.[].number' 2>/dev/null || true)"
+  deps="$(gh pr list --repo "$REPO" --state open --base "$head" --json number -q '.[].number' 2>/dev/null || true)"  # intentional fail-soft
   if [[ -z "$deps" ]]; then
     echo "stacked PRs: none open with base=$head"
     return 0
@@ -140,13 +141,13 @@ wait_ci
 
 if [[ "$DRY" -eq 1 ]]; then
   echo "dry-run: would retarget dependents of $HEAD_REF → $BASE_REF, then merge + delete-branch (if safe), state:done, close #$ISSUE"
-  retarget_dependents "$HEAD_REF" "$BASE_REF" || true
+  retarget_dependents "$HEAD_REF" "$BASE_REF" || true  # intentional fail-soft
   exit 0
 fi
 
 # Retarget FIRST so --delete-branch cannot close dependents with base_ref_deleted
-retarget_dependents "$HEAD_REF" "$BASE_REF" || true
-remaining="$(gh pr list --repo "$REPO" --state open --base "$HEAD_REF" --json number -q '.[].number' 2>/dev/null || true)"
+retarget_dependents "$HEAD_REF" "$BASE_REF" || true  # intentional fail-soft
+remaining="$(gh pr list --repo "$REPO" --state open --base "$HEAD_REF" --json number -q '.[].number' 2>/dev/null || true)"  # intentional fail-soft
 if [[ -z "$remaining" ]]; then
   gh pr merge "$PR" --repo "$REPO" --merge --delete-branch 2>/dev/null || \
     gh pr merge "$PR" --repo "$REPO" --merge
@@ -162,13 +163,21 @@ if [[ "$STATE" == "open" ]]; then
 
 <!-- relentless:author=agent -->
 <!-- relentless:merged -->
-" || true
+" || true  # intentional fail-soft
 fi
 
 gh pr comment "$PR" --repo "$REPO" --body "🤖 Auto-merged (merge commit) per policy \`auto\`
 
 <!-- relentless:author=agent -->
 <!-- relentless:merged mode=\"auto\" -->
-" 2>/dev/null || true
+" 2>/dev/null || true  # intentional fail-soft
 
 echo "Merged PR #${PR}; issue #${ISSUE} → state:done"
+
+if [[ -n "$CLEANUP_WT" ]]; then
+  if [[ "$DRY" -eq 1 ]]; then
+    echo "dry-run: would worktree-cleanup --path $CLEANUP_WT"
+  else
+    "${SCRIPT_DIR}/worktree-cleanup.sh" --path "$CLEANUP_WT" --repo "$REPO" || echo "warn: worktree cleanup failed for $CLEANUP_WT" >&2
+  fi
+fi

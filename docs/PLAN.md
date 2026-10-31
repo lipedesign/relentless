@@ -160,8 +160,8 @@ Leave full upstream process documentation out of this plugin.
 
 - Reviewer auto-assignment  
 - Richer ruleset applicator  
-- Full orchestrator/reviewer/documenter agent packs  
-- Status snapshot automation (PR15)  
+- Reviewer GitHub auto-assignment (still v1.1)  
+- Richer status snapshot automation beyond write-status-snapshot.sh  
 
 ---
 
@@ -201,3 +201,20 @@ Bootstrap prepares the consumer: stack detection, FAIL-closed or real `relentles
 - Reviewer prompts via stdin/file; Claude stream-json requires --verbose; run-isolated-review.sh for self-sufficient orchestrator loop.
 - Isolation hook strips heredoc bodies to avoid false positives on docs text.
 - Codex: prefer Write/apply_patch over huge shell heredocs in nested sessions.
+
+## 13. v1.4.0 include completion (2026-10-31)
+
+Shipped against §1 inventory:
+
+| ID | Practice | In tree |
+|----|----------|---------|
+| PR1–3,5,7,11,16 | Issue/milestone/epic/human-gate/review-merge/labels/dogfood | yes (prior) |
+| PR4 | Decision records | yes — `docs/decisions/`, templates, `new-adr`/`accept-adr`/`decide --adr`, bootstrap seed, dogfood ADR 0001–0002 |
+| PR6 | Named roles | yes — orchestrator + documenter + existing |
+| PR9 | Worktree per writer | yes — skill + create/cleanup + hooks + implementer briefs |
+| PR10 | Conventional commits + Closes #N | yes — doctrine + `check-commit-msg.sh` |
+| PR12 | External content = data | yes — AGENTS + agent briefs + seeded blocks |
+| PR13 | Explicit named failure | yes — doctrine; scripts annotate intentional fail-soft |
+| PR14 | Follow-ups after review | yes — `follow-up-after-review.md` |
+| PR15 | Status snapshot | yes — template + `write-status-snapshot.sh` |
+| Hooks | stop-gate / protect-main / protect-worktree-write | yes |

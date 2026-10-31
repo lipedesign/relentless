@@ -38,6 +38,6 @@ if [[ "$PATCH" -eq 1 ]]; then
     inqa { next }
     { print }
   ')"
-  gh pr edit "$PR" --repo "$REPO" --body "$NEW" >/dev/null || true
+  gh pr edit "$PR" --repo "$REPO" --body "$NEW" >/dev/null || true  # intentional fail-soft
 fi
 echo "ok QA posted on PR #$PR"

@@ -35,7 +35,7 @@ done
 # Infer harness from config or PATH
 if [[ -z "$HARNESS" ]]; then
   if [[ -f "${WORKDIR}/.relentless/config.json" ]]; then
-    HARNESS="$(jq -r '.harness // empty' "${WORKDIR}/.relentless/config.json" 2>/dev/null || true)"
+    HARNESS="$(jq -r '.harness // empty' "${WORKDIR}/.relentless/config.json" 2>/dev/null || true)"  # intentional fail-soft
   fi
 fi
 if [[ -z "$HARNESS" || "$HARNESS" == "both" ]]; then
@@ -82,20 +82,20 @@ case "$HARNESS" in
       --verbose \
       --output-format stream-json \
       < "$PROMPT_FILE" \
-      > "${OUT_DIR}/reviewer.stream.jsonl" 2>"${OUT_DIR}/reviewer.stderr.log" || true
+      > "${OUT_DIR}/reviewer.stream.jsonl" 2>"${OUT_DIR}/reviewer.stderr.log" || true  # intentional fail-soft
     # Extract last assistant text if stream-json; else fall back to raw
     if [[ -s "${OUT_DIR}/reviewer.stream.jsonl" ]]; then
       jq -r 'select(.type=="assistant" or .message.content) | .message.content[]? // . | select(.type=="text")? // empty | .text // empty' \
-        "${OUT_DIR}/reviewer.stream.jsonl" 2>/dev/null | tail -n +1 > "$VERDICT_RAW" || true
+        "${OUT_DIR}/reviewer.stream.jsonl" 2>/dev/null | tail -n +1 > "$VERDICT_RAW" || true  # intentional fail-soft
       if [[ ! -s "$VERDICT_RAW" ]]; then
         # Alternate stream shape: result field
-        jq -r 'select(.type=="result") | .result // empty' "${OUT_DIR}/reviewer.stream.jsonl" 2>/dev/null > "$VERDICT_RAW" || true
+        jq -r 'select(.type=="result") | .result // empty' "${OUT_DIR}/reviewer.stream.jsonl" 2>/dev/null > "$VERDICT_RAW" || true  # intentional fail-soft
       fi
     fi
     if [[ ! -s "$VERDICT_RAW" ]]; then
       # Non-stream fallback
       claude -p --agent relentless:reviewer --allowedTools "Read,Grep,Glob,Bash(gh *)" \
-        < "$PROMPT_FILE" > "$VERDICT_RAW" 2>>"${OUT_DIR}/reviewer.stderr.log" || true
+        < "$PROMPT_FILE" > "$VERDICT_RAW" 2>>"${OUT_DIR}/reviewer.stderr.log" || true  # intentional fail-soft
     fi
     ;;
   codex)
@@ -104,7 +104,7 @@ case "$HARNESS" in
       --sandbox read-only \
       -C "$WORKDIR" \
       < "$PROMPT_FILE" \
-      > "$VERDICT_RAW" 2>"${OUT_DIR}/reviewer.stderr.log" || true
+      > "$VERDICT_RAW" 2>"${OUT_DIR}/reviewer.stderr.log" || true  # intentional fail-soft
     ;;
   *)
     echo "error: unknown harness $HARNESS" >&2; exit 2 ;;
@@ -126,12 +126,12 @@ if grep -qiE '^\s*`?approved`?\s*$|## Verdict[[:space:]]*$' "$VERDICT_RAW" 2>/de
   fi
 fi
 if [[ -z "$VERDICT" ]]; then
-  VERDICT="$(grep -oE '`?(approved|changes_requested)`?' "$VERDICT_RAW" 2>/dev/null | tr -d '`' | tail -1 || true)"
+  VERDICT="$(grep -oE '`?(approved|changes_requested)`?' "$VERDICT_RAW" 2>/dev/null | tr -d '`' | tail -1 || true)"  # intentional fail-soft
 fi
 if [[ -z "$VERDICT" ]]; then
   echo "error: could not parse verdict from $VERDICT_RAW" >&2
   echo "---- reviewer output (tail) ----" >&2
-  tail -40 "$VERDICT_RAW" >&2 || true
+  tail -40 "$VERDICT_RAW" >&2 || true  # intentional fail-soft
   exit 1
 fi
 echo "$VERDICT" > "$VERDICT_FILE"

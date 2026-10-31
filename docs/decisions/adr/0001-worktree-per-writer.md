@@ -1,0 +1,33 @@
+# ADR 0001 — Worktree per writer
+
+- **Status:** accepted
+- **Date:** 2026-10-31 (America/Sao_Paulo)
+- **Issue:** #0
+- **Human gate:** required (`human:pending` → `/decide`)
+- **Decided by:** Marcelus
+
+## Context
+Stacked PRs and shared checkouts caused agents to collide (dirty trees, wrong base branches, `base_ref_deleted` after merges). Lineage marvinz → apollo → lohra-ts proved one writer per worktree from fresh origin/main.
+
+## Options
+
+### 1. One git worktree per implementer from origin/main; remote branch push is the lock
+- Pros: isolation; no shared dirty tree; clear lock; cleanup after merge
+- Cons: more disk; need `.worktreeinclude` for local secrets
+
+### 2. Shared primary checkout with branch switching
+- Pros: simple
+- Cons: parallel writers collide; stacked PR pain (rejected)
+
+### 3. Persistent long-lived agent branches without worktrees
+- Pros: fewer paths
+- Cons: stale bases; easy to commit on wrong branch (rejected)
+
+## Decision
+Option 1 accepted on 2026-10-31. Skill worktree-segura; scripts worktree-create/cleanup; hooks protect-main + protect-worktree-write + stop-gate.
+
+
+## Consequences
+Positive / negative / follow-ups.
+
+## Evidence

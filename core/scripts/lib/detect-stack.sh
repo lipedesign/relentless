@@ -37,7 +37,7 @@ detect_stack() {
     fi
     # scripts from package.json
     local scripts
-    scripts="$(jq -r '.scripts // {} | keys[]' "${root}/package.json" 2>/dev/null || true)"
+    scripts="$(jq -r '.scripts // {} | keys[]' "${root}/package.json" 2>/dev/null || true)"  # intentional fail-soft
     _has_script() { grep -Fxq "$1" <<<"$scripts"; }
     if _has_script lint; then LINT="${PM} run lint"
     elif _has_script eslint; then LINT="${PM} run eslint"

@@ -1,0 +1,4 @@
+name = "documenter"
+description = "Status snapshots + decisions index at milestone close. Full brief: agents/documenter.md"
+# Launch notes: see docs/harness-profiles.md and agents/documenter.md
+# Codex has no Stop hooks — honor stop-gate / protect-main / worktree rules as instructions.

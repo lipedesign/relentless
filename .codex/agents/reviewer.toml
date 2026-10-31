@@ -1,5 +1,4 @@
 name = "reviewer"
-description = "Isolated agnostic reviewer. Fresh context: issue AC + PR diff (no lockfiles) + QA only. Read-only."
-# Launch: codex exec --sandbox read-only  (or codex review --base main)
-# Inputs: output of build-review-bundle.sh ONLY — never implementer chat.
-# Full brief: agents/reviewer.md
+description = "Isolated read-only review; require ADR refs when area decided. Full brief: agents/reviewer.md"
+# Launch notes: see docs/harness-profiles.md and agents/reviewer.md
+# Codex has no Stop hooks — honor stop-gate / protect-main / worktree rules as instructions.

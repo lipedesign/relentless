@@ -97,7 +97,7 @@ else
 fi
 
 IS_EMPTY="$(gh repo view "$REPO" --json isEmpty -q .isEmpty 2>/dev/null || echo false)"
-DEFAULT_BRANCH="$(gh repo view "$REPO" --json defaultBranchRef -q '.defaultBranchRef.name // empty' 2>/dev/null || true)"
+DEFAULT_BRANCH="$(gh repo view "$REPO" --json defaultBranchRef -q '.defaultBranchRef.name // empty' 2>/dev/null || true)"  # intentional fail-soft
 
 if [[ "$IS_EMPTY" == "true" || -z "$DEFAULT_BRANCH" ]]; then
   echo "empty-repo: no default branch yet"
@@ -110,11 +110,11 @@ if [[ "$IS_EMPTY" == "true" || -z "$DEFAULT_BRANCH" ]]; then
       fi
       mkdir -p "$WORKDIR"
       if [[ ! -d "$WORKDIR/.git" ]]; then
-        git clone "https://github.com/${REPO}.git" "$WORKDIR" 2>/dev/null || true
+        git clone "https://github.com/${REPO}.git" "$WORKDIR" 2>/dev/null || true  # intentional fail-soft
       fi
       (
         cd "$WORKDIR"
-        if [[ ! -d .git ]]; then git init -b main; git remote add origin "https://github.com/${REPO}.git" 2>/dev/null || true; fi
+        if [[ ! -d .git ]]; then git init -b main; git remote add origin "https://github.com/${REPO}.git" 2>/dev/null || true; fi  # intentional fail-soft
         if [[ ! -f README.md ]]; then
           printf '# %s\n\nBootstrapped by Relentless.\n' "${REPO##*/}" > README.md
         fi
@@ -125,7 +125,7 @@ if [[ "$IS_EMPTY" == "true" || -z "$DEFAULT_BRANCH" ]]; then
           git push -u origin HEAD:main
           echo "empty-repo: pushed initial commit"
         else
-          git push -u origin HEAD:main 2>/dev/null || true
+          git push -u origin HEAD:main 2>/dev/null || true  # intentional fail-soft
         fi
       )
     fi
@@ -222,7 +222,7 @@ else
   echo "plan: seed config with merge.default=${MERGE_DEFAULT} decider=${DECIDER_NAME:-'(from gh)'} stack=${STACK}"
 fi
 
-EXISTING="$(gh label list --repo "$REPO" --limit 200 --json name -q '.[].name' 2>/dev/null || true)"
+EXISTING="$(gh label list --repo "$REPO" --limit 200 --json name -q '.[].name' 2>/dev/null || true)"  # intentional fail-soft
 while IFS= read -r row; do
   name="$(jq -r '.name' <<<"$row")"
   color="$(jq -r '.color' <<<"$row")"
@@ -230,12 +230,12 @@ while IFS= read -r row; do
   if grep -Fxq "$name" <<<"$EXISTING"; then
     echo "label exists: $name"
     if [[ "$APPLY" -eq 1 ]]; then
-      gh label edit "$name" --repo "$REPO" --color "$color" --description "$desc" >/dev/null || true
+      gh label edit "$name" --repo "$REPO" --color "$color" --description "$desc" >/dev/null || true  # intentional fail-soft
     fi
   else
     echo "label create: $name"
     if [[ "$APPLY" -eq 1 ]]; then
-      gh label create "$name" --repo "$REPO" --color "$color" --description "$desc" >/dev/null || true
+      gh label create "$name" --repo "$REPO" --color "$color" --description "$desc" >/dev/null || true  # intentional fail-soft
     fi
   fi
 done < <(jq -c '.labels[]' "$LABELS_FILE")
@@ -309,7 +309,7 @@ if [[ "$SEED_FILES" -eq 1 ]]; then
   fi
 
   if [[ "$HARNESS" == "codex" || "$HARNESS" == "both" ]]; then
-    for agent in planner implementer qa reviewer; do
+    for agent in planner implementer qa reviewer orchestrator documenter; do
       src="${SCRIPT_DIR}/../../.codex/agents/${agent}.toml"
       [[ -f "$src" ]] && seed_copy "$src" ".codex/agents/${agent}.toml"
     done
@@ -334,6 +334,35 @@ if [[ "$SEED_FILES" -eq 1 ]]; then
   seed_copy "${TEMPLATES_ROOT}/milestone-outcome.md" "docs/relentless/milestone-outcome.example.md"
   seed_copy "${TEMPLATES_ROOT}/epic-body.md" "docs/relentless/epic-body.example.md"
   seed_copy "${TEMPLATES_ROOT}/investigation-body.md" "docs/relentless/investigation-body.example.md"
+
+  # Decision records (first-class) + status + follow-up + worktreeinclude
+  seed_copy "${TEMPLATES_ROOT}/decisions/README.md" "docs/decisions/README.md"
+  seed_copy "${TEMPLATES_ROOT}/decisions/adr-template.md" "docs/decisions/adr/TEMPLATE.md"
+  seed_copy "${TEMPLATES_ROOT}/decisions/note-template.md" "docs/decisions/notes/TEMPLATE.md"
+  seed_copy "${TEMPLATES_ROOT}/status-mN.md" "docs/status/TEMPLATE.md"
+  seed_copy "${TEMPLATES_ROOT}/follow-up-after-review.md" "docs/relentless/follow-up-after-review.example.md"
+  # .worktreeinclude — only if absent (consumer-owned secrets list)
+  if [[ -n "$WORKDIR" ]]; then
+    wtinc="${WORKDIR}/.worktreeinclude"
+    if [[ ! -f "$wtinc" ]]; then
+      echo "seed write: .worktreeinclude"
+      if [[ "$APPLY" -eq 1 ]]; then
+        cat > "$wtinc" <<'WTINC'
+# Paths (relative to repo root) copied into each Relentless worktree after `worktree-create.sh`.
+# Add local-only files the implementer needs (.env.local, etc.). Do not commit secrets.
+# .env.local
+WTINC
+      fi
+    else
+      echo "seed skip (exists): .worktreeinclude"
+    fi
+    # Ensure adr/notes dirs exist on apply even if copy skipped
+    if [[ "$APPLY" -eq 1 ]]; then
+      mkdir -p "${WORKDIR}/docs/decisions/adr" "${WORKDIR}/docs/decisions/notes" "${WORKDIR}/docs/status"
+    fi
+  else
+    echo "seed (needs --workdir): docs/decisions/*, docs/status/TEMPLATE.md, .worktreeinclude"
+  fi
 else
   echo "seed: skipped (--no-seed-files)"
 fi

@@ -1,3 +1,4 @@
 name = "planner"
-description = "Break product outcomes into milestone → epic (understanding) → native sub-issues. Does not implement code."
-# Instructions live in agents/planner.md and AGENTS.md (shared with Claude).
+description = "Milestone → epic → sub-issues; durable forks → ADR + human-gate. Full brief: agents/planner.md"
+# Launch notes: see docs/harness-profiles.md and agents/planner.md
+# Codex has no Stop hooks — honor stop-gate / protect-main / worktree rules as instructions.

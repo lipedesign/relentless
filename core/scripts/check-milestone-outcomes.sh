@@ -58,7 +58,7 @@ while IFS= read -r row; do
     echo "ok: $title (#$number) outcome section"
   fi
 
-  pending="$(gh issue list --repo "$REPO" --milestone "$title" --state open --label "human:pending" --json number,title -q '.[] | "#\(.number) \(.title)"' 2>/dev/null || true)"
+  pending="$(gh issue list --repo "$REPO" --milestone "$title" --state open --label "human:pending" --json number,title -q '.[] | "#\(.number) \(.title)"' 2>/dev/null || true)"  # intentional fail-soft
   if [[ -n "$pending" ]]; then
     echo "PENDING: milestone \"$title\" (#$number) still has human:pending issues:"
     printf '%s\n' "$pending" | while IFS= read -r line; do echo "  $line"; done
@@ -69,7 +69,7 @@ while IFS= read -r row; do
 
   # Epic parent (prefer open epic; fall back to any epic in the milestone)
   mapfile -t EPIC_ROWS < <(gh issue list --repo "$REPO" --milestone "$title" --state all --label epic \
-    --json number,title,state -q '.[] | "\(.number)\t\(.state)\t\(.title)"' 2>/dev/null || true)
+    --json number,title,state -q '.[] | "\(.number)\t\(.state)\t\(.title)"' 2>/dev/null || true)  # intentional fail-soft
 
   EPIC_NUM=""
   for er in "${EPIC_ROWS[@]:-}"; do
