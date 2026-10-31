@@ -57,6 +57,51 @@ HEAD_REF="$(jq -r .headRefName <<<"$PR_JSON")"
 BASE_REF="$(jq -r .baseRefName <<<"$PR_JSON")"
 echo "head SHA: $HEAD_SHA (branch=$HEAD_REF → $BASE_REF)"
 
+# Accepted ADRs introduced by this PR need a prior decision-request on the linked issue.
+# Agents can write "Decided by" themselves; GitHub cannot tell that account from the human.
+check_accepted_adr_decision_requests() {
+  local files rc f b64 text status comments crc
+  set +e
+  files="$(gh api --paginate "repos/${REPO}/pulls/${PR}/files" --jq '.[].filename' 2>/dev/null)"
+  rc=$?
+  set -e
+  if [[ $rc -ne 0 ]]; then
+    # intentional fail-soft: a files-API outage must not block every merge; the guard runs when the list is available
+    echo "warn: could not list PR files; skipped accepted-ADR decision-request check" >&2
+    return 0
+  fi
+  while IFS= read -r f; do
+    [[ "$f" == docs/decisions/adr/*.md ]] || continue
+    set +e
+    b64="$(gh api "repos/${REPO}/contents/${f}?ref=${HEAD_SHA}" --jq .content 2>/dev/null)"
+    rc=$?
+    set -e
+    if [[ $rc -ne 0 || -z "$b64" ]]; then
+      echo "error: could not read ${f} at ${HEAD_SHA}; refusing merge (accepted-ADR check)" >&2
+      exit 1
+    fi
+    text="$(printf '%s' "$b64" | tr -d '[:space:]' | base64 -d 2>/dev/null || true)"
+    status="$(printf '%s\n' "$text" | sed -n 's/^- \*\*Status:\*\*[[:space:]]*//p' | head -1 | tr '[:upper:]' '[:lower:]' | tr -d '\r')"
+    [[ "$status" == "accepted" ]] || continue
+    set +e
+    comments="$(gh api --paginate "repos/${REPO}/issues/${ISSUE}/comments" --jq '.[].body' 2>/dev/null)"
+    crc=$?
+    set -e
+    if [[ $crc -ne 0 ]]; then
+      echo "error: issue #${ISSUE} comments unreadable; refusing merge while ${f} is accepted" >&2
+      exit 1
+    fi
+    if ! printf '%s\n' "$comments" | grep -q 'relentless:decision-request'; then
+      echo "error: ${f} is accepted in this PR but issue #${ISSUE} has no decision-request comment (<!-- relentless:decision-request -->). Refusing merge." >&2
+      echo "Agents must not accept ADRs. The decider runs decide.sh in their own terminal, outside the agent session." >&2
+      exit 1
+    fi
+  done <<<"$files"
+  return 0
+}
+
+check_accepted_adr_decision_requests
+
 wait_ci() {
   local tries=0
   local max="${MERGE_CI_TRIES:-36}"

@@ -17,7 +17,7 @@ Goal: the consumer repo works with Relentless end-to-end (labels, real CI, docs 
    - If stack detection finds no test command, **recommend human** and only set `auto` if the user insists (warn that merge-if-ready trusts CI).
 3. **decider.name** (and github login if not `gh api user`)
 4. **harness**: `claude` | `codex` | `both`
-5. **Branch protection / rulesets**: opt-in (`rulesets.apply=true`) — fail-soft; default off
+5. **GitHub branch protection on main**: optional question, **off unless the user explicitly says yes**. Do not pass `--branch-protection` otherwise. Local git hooks are installed either way (they are not a substitute you skip). If they say yes, the apply command includes `--branch-protection` (fail-soft when the token cannot admin the repo).
 6. Optional: **first product outcome** text → after apply, create milestone + epic
 
 ## Plugin install (before or during)
@@ -51,6 +51,7 @@ cd "$WORKDIR"
 # After user approves the plan:
 "$RELENTLESS_ROOT/core/scripts/bootstrap.sh" --repo OWNER/NAME --workdir . \
   --merge-default human --decider "NAME" --harness both --apply
+# Add --branch-protection only after an explicit yes. Default is off.
 ```
 
 ## Commit + PR
@@ -96,6 +97,8 @@ If the user described a product outcome:
 | Docs | `<!-- relentless:start -->` blocks upserted (never skip existing files) |
 | Issues | `relentless.yml` + `investigation.yml` + `epic.yml` + `config.yml` |
 | Config | `checks.{install,lint,typecheck,test,build}` + `stack` |
+| Git hooks | `.relentless/githooks/pre-commit` and `pre-push`. `core.hooksPath` points at them, or an existing hooksPath / husky is chained and not replaced. They refuse commits on main/master, pushes to main/master, and non-fast-forward pushes. |
+| Branch protection | **Off** unless the setup question was answered yes (`--branch-protection`, fail-soft). |
 
 Never vendor plugin `agents/` / `skills/` into the consumer.
 

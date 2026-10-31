@@ -22,3 +22,4 @@ core/scripts/bootstrap.sh --repo OWNER/NAME --workdir PATH \
 - Seeds issue forms including **epic** + `config.yml` (`blank_issues_enabled: false`)
 - Records `checks` + `stack` in `.relentless/config.json`
 - Never vendors plugin agents/skills
+- Installs `.relentless/githooks` (or chains an existing hooksPath / husky). Does **not** enable GitHub branch protection unless `--branch-protection` is passed.

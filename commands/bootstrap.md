@@ -5,7 +5,7 @@ argument-hint: "<owner/name> [workdir]"
 
 # /bootstrap
 
-Prefer **`/relentless:setup`** (skill `setup`). This command is the raw script:
+Prefer **`/relentless:setup`** (skill `setup`). This command is the raw script. It installs git hooks. Add `--branch-protection` only after an explicit yes; GitHub branch protection stays off by default.
 
 ```bash
 core/scripts/bootstrap.sh --check-scopes

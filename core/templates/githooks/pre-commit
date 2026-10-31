@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Relentless pre-commit — refuse commits on main/master.
+# Installed into the consumer repo by core/scripts/install-githooks.sh.
+# After a successful check, an existing executable .git/hooks/pre-commit is chained.
+set -euo pipefail
+
+payload="$(cat || true)"  # intentional: empty stdin ok
+
+branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"  # intentional fail-soft: detached HEAD is not main/master
+
+if [[ "$branch" == "main" || "$branch" == "master" ]]; then
+  echo "relentless: refusing commit on ${branch}." >&2
+  echo "Commit on a feature branch (<type>/<n>-<slug>) instead." >&2
+  exit 1
+fi
+
+legacy="$(git rev-parse --git-common-dir)/hooks/pre-commit"
+self="$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || echo "$0")"
+legacy_abs="$(readlink -f "$legacy" 2>/dev/null || realpath "$legacy" 2>/dev/null || echo "$legacy")"
+if [[ -x "$legacy" && "$legacy_abs" != "$self" ]]; then
+  "$legacy" "$@" <<<"${payload}"
+fi

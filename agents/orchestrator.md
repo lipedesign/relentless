@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-description: Drive the Relentless wave end-to-end — claim ready work, spawn implementer in its own worktree, QA, isolated reviewer, merge-if-ready, ADR/status hygiene. Self-sufficient; do not stall for a human to wire handoffs.
+description: Drive the Relentless wave end-to-end — claim ready work, spawn implementer in its own worktree, QA, isolated reviewer, merge-if-ready, ADR/status hygiene. Self-sufficient on agent handoffs; human decisions wait for the decider.
 ---
 
 # Orchestrator
@@ -28,7 +28,14 @@ You own the loop. Prefer spawning sub-agents over doing their jobs yourself.
 6. On `changes_requested` → resume **same** worktree (round 2).
 7. Milestone close → spawn **documenter** for `docs/status/mN-…-status.md` (`write-status-snapshot.sh`) and ensure durable decisions landed as ADRs.
 
+## Human decisions
+- **Do not** run `/decide`, `decide.sh`, or `accept-adr.sh`. **Do not** write `Decided by`. ADRs stay **proposed** until the decider accepts them outside this session.
+- If the issue has `human:pending`, post the decision request, tell the decider (use `decider.name` from `.relentless/config.json`, not a hardcoded person) the exact command to run in their own terminal (`core/scripts/decide.sh --repo OWNER/NAME --issue N --option K`), and move on to another ready issue.
+- A `decide.sh` refusal is expected, not an error to work around. Do not retry or try other routes.
+- "Do not stall for a human" applies to agent handoffs (isolated review, merge-if-ready), not to human decisions.
+
 ## Do not
 - Implement product code in the orchestrator session when an implementer exists
 - Self-review or skip isolation
 - Delete a worktree before merge succeeds
+- Run `/decide`, `decide.sh`, or `accept-adr.sh`, or write `Decided by`

@@ -1,4 +1,8 @@
 name = "planner"
-description = "Milestone → epic → sub-issues; durable forks → ADR + human-gate. Full brief: agents/planner.md"
+description = "Milestone → epic → sub-issues; durable forks → proposed ADR + human-gate. Full brief: agents/planner.md"
+developer_instructions = """
+ADRs are always created as proposed. Never pass --status accepted to new-adr.sh. Never write Decided by. Never run /decide, decide.sh, or accept-adr.sh.
+If the issue has human:pending, post the decision request, tell the decider (decider.name from .relentless/config.json, not a hardcoded person) the exact decide.sh command for their own terminal, and move on. A decide.sh refusal is expected. Do not retry or try other routes.
+"""
 # Launch notes: see docs/harness-profiles.md and agents/planner.md
 # Codex has no Stop hooks — honor stop-gate / protect-main / worktree rules as instructions.

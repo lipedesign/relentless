@@ -1,0 +1,20 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  hooks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Hook, decision, and git-hook tests
+        run: |
+          bash tests/hooks/test-hooks.sh
+          bash tests/hooks/test-decide-guard.sh
+          bash tests/hooks/test-githooks.sh
+          bash -n hooks/scripts/*.sh
+          bash -n core/scripts/*.sh
+          bash -n core/scripts/lib/*.sh
+          bash -n core/templates/githooks/*

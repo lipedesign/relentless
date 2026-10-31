@@ -51,7 +51,9 @@ Every workflow comment:
 - Human / relayed decision: leading `☺️` + `<!-- relentless:author=human decider="<decider.name>" -->`
 
 ## Human decisions
-When moving an issue to `human:pending`, the agent **must** comment using **`core/templates/decision-request.md`**. Skills: `human-gate`. Commands: `/request-decision`, `/decide`.
+When moving an issue to `human:pending`, the agent **must** comment using **`core/templates/decision-request.md`**. Skills: `human-gate`. Command: `/request-decision`.
+
+Agents **do not** run `/decide`, `decide.sh`, or `accept-adr.sh`, and do not write `Decided by`. ADRs are created **proposed**. If the issue has `human:pending`, post the request, tell the decider (`decider.name`, not a hardcoded person) the exact `decide.sh --repo OWNER/NAME --issue N --option K` command for their own terminal, and move on to another ready issue. A `decide.sh` refusal is expected. Do not retry or try other routes. "Do not stall for a human" applies to agent handoffs (review, merge), not to human decisions. Claude records a typed `/decide` in the UserPromptSubmit hook. Codex has no TTY, even in the interactive TUI; the human runs `decide.sh` outside the session.
 
 ## Orchestrator loop (implement → review → merge)
 
@@ -91,7 +93,7 @@ Or manually:
    - Codex: `codex exec --sandbox read-only -C . < review-bundle.md`
      (Prefer Write/apply_patch inside nested sessions; huge `cat <<EOF` heredocs can false-positive Codex shell classifiers.)
 3. `apply-review-verdict.sh … --verdict approved|changes_requested`
-4. If approved → **immediately** `merge-if-ready.sh` (do not stall)
+4. If approved → **immediately** `merge-if-ready.sh` (do not stall on the agent handoff; a `human:pending` decision is not this handoff)
 
 Reviewer is **read-only**. Only AC + PR diff + QA — no implementer chat.
 
@@ -154,7 +156,7 @@ Stack detection writes real `relentless-ci.yml` (or FAIL-closed if no test). Ups
 - **Read `docs/decisions/` before planning or implementing.**
 - **ADR** (`docs/decisions/adr/NNNN-<slug>.md`): architecture / public contract / durable product rule. **Human gate required.** Silence ≠ approval.
 - **Note** (`docs/decisions/notes/YYYY-MM-DD-<slug>.md`): measured intentional behavior; no human gate.
-- Flow: proposed ADR → `request-decision` → `/decide --adr` (or `--create-adr`) → Status **accepted**, **Decided by**, issue comment links ADR.
+- Flow: proposed ADR → `request-decision` → the **decider** runs `/decide` (Claude hook) or `decide.sh --adr` in their own terminal → Status **accepted**, **Decided by**, issue comment links ADR. Agents never write that acceptance.
 - Helpers: `new-adr.sh`, `accept-adr.sh`, `decide.sh`.
 - Reviewer: PRs touching a decided area **must** reference the ADR path.
 
@@ -162,6 +164,7 @@ Stack detection writes real `relentless-ci.yml` (or FAIL-closed if no test). Ups
 - Skill `worktree-segura`; scripts `worktree-create.sh` / `worktree-cleanup.sh`.
 - Branch `<type>/<n>-<slug>` from fresh `origin/main` only. Remote push = lock.
 - Hooks: `pretool-protect-main`, `pretool-protect-worktree-write`, `stop-gate` (Claude). Codex: honor the same rules in agent briefs / AGENTS (no Stop hooks).
+- Consumer git hooks (`.relentless/githooks`, via `core.hooksPath` or chained onto husky) refuse commits and pushes to main/master and force-pushes. GitHub branch protection stays off unless setup was explicitly told yes.
 
 ## Conventional commits (PR10)
 - Subject: `type(scope)?: description` with standard types.
@@ -183,7 +186,9 @@ Project scripts must not swallow errors with bare `|| true` / redirected-away st
 
 ## Stop / protect hooks
 - `stop-gate.sh`: block end-of-turn with dirty worktree; `state:in-progress` without pushed branch/PR; open PR without `## QA` section.
-- `pretool-protect-main.sh`: no commit/push on main; no force-push / reset --hard / clean -f.
+- `pretool-protect-main.sh`: no commit/push on main (including `git -C` / `cd` onto another checkout); no force-push (`-f`, `--force`, `--force-with-lease`, `+refspec`) / reset --hard / clean -f.
+- `pretool-gh-workflow.sh`: an agent role cannot invoke `decide.sh`, `accept-adr.sh`, or `new-adr.sh --status accepted`.
+- Run `bash tests/hooks/test-hooks.sh`, `tests/hooks/test-decide-guard.sh`, and `tests/hooks/test-githooks.sh`.
 - `pretool-protect-worktree-write.sh`: implementer writes stay inside the worktree.
 
 ## Out of scope / deferred

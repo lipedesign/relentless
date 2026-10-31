@@ -9,6 +9,7 @@ MERGE_DEFAULT="" DECIDER_NAME="" DECIDER_GITHUB=""
 HARNESS="both"
 INIT_EMPTY=1
 MERGE_DEFAULT_EXPLICIT=0
+BRANCH_PROTECTION=0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/common.sh
 source "${SCRIPT_DIR}/lib/common.sh"
@@ -39,11 +40,16 @@ Usage: $(basename "$0") --repo OWNER/NAME [options]
   --no-init-empty          Do not create initial commit on empty repos
   --harness claude|codex|both
                            Which agent harness this repo uses (default: both).
+  --branch-protection      Opt in to GitHub branch protection on the default
+                           branch. Off unless this flag is passed. Fail-soft.
 
 Detects stack under --workdir, writes .github/workflows/relentless-ci.yml (real
 checks or FAIL-closed placeholder), upserts <!-- relentless:start --> blocks in
 AGENTS.md / CLAUDE.md, seeds issue forms including epic + config.yml
 (blank_issues_enabled: false), records checks in .relentless/config.json.
+Installs .relentless/githooks (pre-commit, pre-push) via core.hooksPath, or
+chains an existing hooksPath / husky without replacing it. GitHub branch
+protection stays off unless --branch-protection.
 USAGE
 }
 
@@ -61,6 +67,7 @@ while [[ $# -gt 0 ]]; do
     --decider-github) DECIDER_GITHUB="${2:-}"; shift 2 ;;
     --no-init-empty) INIT_EMPTY=0; shift ;;
     --harness) HARNESS="${2:-}"; shift 2 ;;
+    --branch-protection) BRANCH_PROTECTION=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown arg: $1" >&2; usage; exit 2 ;;
   esac
@@ -183,10 +190,12 @@ write_or_patch_config() {
     --arg stack "$STACK" --arg pm "$PM" \
     --arg install "$INSTALL" --arg lint "$LINT" --arg typecheck "$TYPECHECK" \
     --arg test "$TEST" --arg build "$BUILD" \
+    --argjson bp "${BRANCH_PROTECTION:-0}" \
     '
     if ($name | length) > 0 then .decider.name = $name else . end |
     if ($gh | length) > 0 then .decider.github = $gh | .workers.default.github = $gh else . end |
     if ($merge | length) > 0 then .merge.default = $merge else . end |
+    if $bp == 1 then .rulesets = ((.rulesets // {}) + {apply: true}) else . end |
     .stack = $stack |
     .package_manager = (if $pm | length > 0 then $pm else null end) |
     .checks = {
@@ -367,12 +376,61 @@ else
   echo "seed: skipped (--no-seed-files)"
 fi
 
-if [[ -n "$CONFIG" && -f "$CONFIG" ]]; then
-  if [[ "$(jq -r '.rulesets.apply // false' "$CONFIG")" == "true" ]]; then
-    echo "rulesets: apply=true (fail soft)"
-  else
-    echo "rulesets: apply=false"
+apply_branch_protection() {
+  local branch="${DEFAULT_BRANCH:-main}"
+  [[ -n "$branch" ]] || branch="main"
+  local resp rc
+  set +e
+  resp="$(gh api -X POST "repos/${REPO}/rulesets" --input - <<JSON
+{
+  "name": "relentless-protect-default",
+  "target": "branch",
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": {
+    "ref_name": {
+      "include": ["refs/heads/${branch}"],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {"type": "deletion"},
+    {"type": "non_fast_forward"}
+  ]
+}
+JSON
+)"
+  rc=$?
+  set -e
+  if [[ $rc -ne 0 ]]; then
+    # intentional fail-soft: branch protection is opt-in and often denied by token scope
+    echo "warn: branch protection API failed (not enabled): ${resp}" >&2
+    return 0
   fi
+  echo "branch protection: enabled on ${branch} (deletion + non-fast-forward blocked)"
+}
+
+if [[ -n "$WORKDIR" ]]; then
+  if [[ "$APPLY" -eq 1 ]]; then
+    "${SCRIPT_DIR}/install-githooks.sh" --workdir "$WORKDIR"
+  else
+    echo "plan: install .relentless/githooks (pre-commit, pre-push)"
+    echo "plan: core.hooksPath=.relentless/githooks, or chain an existing hooksPath/husky without replacing it"
+    echo "plan: hooks refuse commits on main/master, pushes to main/master, and force-pushes"
+  fi
+else
+  echo "githooks: needs --workdir"
+fi
+
+if [[ "$BRANCH_PROTECTION" -eq 1 ]]; then
+  echo "branch protection: opted in (fail-soft)"
+  if [[ "$APPLY" -eq 1 ]]; then
+    apply_branch_protection
+  else
+    echo "plan: would enable GitHub branch protection on ${DEFAULT_BRANCH:-main}"
+  fi
+else
+  echo "branch protection: off (default; pass --branch-protection only after an explicit yes)"
 fi
 
 echo "== done ($MODE) =="

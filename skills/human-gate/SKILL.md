@@ -13,7 +13,7 @@ If the options change architecture, a public contract, merge/security policy, or
 1. Create a **proposed** ADR before or with the request:
    `core/scripts/new-adr.sh --workdir . --title "…" --slug … --issue N`
 2. Mention the path in the decision-request body (`Proposed ADR: docs/decisions/adr/NNNN-….md`).
-3. Resolve with `/decide` + `--adr` (or `--create-adr`) so Status becomes **accepted** and **Decided by** is filled.
+3. The **decider** resolves it, not the agent. On Claude they type `/decide` (the UserPromptSubmit hook records it). On Codex, and from any terminal, they run `decide.sh` themselves with `--adr` (or `--create-adr`). Agents do not run `/decide`, `decide.sh`, or `accept-adr.sh`, and do not write `Decided by`. A refusal is expected.
 
 Ephemeral tactical choices may use `--no-adr`.
 
@@ -22,6 +22,6 @@ Ephemeral tactical choices may use `--no-adr`.
    - Adds `human:pending`
    - **Swaps** to `state:blocked` (removes other `state:*`; never stacks)
    - Assigns `decider.github`
-2. Resolve only via `/decide` / `decide.sh` (☺️ + `human:decided` + `state:todo` swap; ADR when durable).
+2. The decider resolves it outside the agent session (`/decide` on Claude, or `decide.sh` in their own terminal). That posts ☺️ + `human:decided` + `state:todo` (ADR when durable). Agents do not call the script. If the issue is `human:pending`, tell the decider (`decider.name`) the exact command and move on.
 
 Config path resolves from git root `.relentless/config.json` when relative CWD fails.
