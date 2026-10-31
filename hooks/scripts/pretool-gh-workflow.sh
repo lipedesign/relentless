@@ -3,8 +3,8 @@
 # Claude Code / Codex: exit 2 = block the tool call.
 set -euo pipefail
 
-INPUT="$(cat || true)"
-CMD="$(printf '%s' "$INPUT" | jq -r '.tool_input.command // .command // empty' 2>/dev/null || true)"
+INPUT="$(cat || true)"  # intentional: empty stdin ok
+CMD="$(printf '%s' "$INPUT" | jq -r '.tool_input.command // .command // empty' 2>/dev/null || true)"  # intentional fail-soft
 [[ -n "$CMD" ]] || exit 0
 
 # Allow our own helpers always

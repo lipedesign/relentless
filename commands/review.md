@@ -1,17 +1,26 @@
 ---
-description: Spawn isolated reviewer with only issue AC, PR diff (no lockfiles), and QA; then apply verdict; on approve run merge-if-ready
+description: Orchestrator spawns isolated reviewer (stdin bundle), applies verdict, then merge-if-ready — no human resume
 argument-hint: "<pr-number> [issue-number]"
 ---
 
 # /review
 
+**You (orchestrator) run this end-to-end.** Do not stop for a driver to spawn the reviewer.
+
+Prefer one-shot:
+```bash
+core/scripts/run-isolated-review.sh --repo OWNER/NAME --pr $1 --issue $2 \
+  --harness claude --workdir . --merge
+```
+
+Manual sequence:
 1. Build bundle (lockfiles excluded):
    ```bash
    core/scripts/build-review-bundle.sh --repo OWNER/NAME --pr $1 --issue $2 --out review-bundle.md
    ```
-2. Start a **fresh** reviewer session — no implementer chat:
-   - Claude: `claude -p --agent relentless:reviewer "$(cat review-bundle.md)"`
-   - Codex: `codex exec --sandbox read-only "$(cat review-bundle.md)"`
+2. Fresh reviewer session — **stdin**, not argv (`$(cat …)` fails on large diffs):
+   - Claude: `claude -p --agent relentless:reviewer --verbose --output-format stream-json < review-bundle.md`
+   - Codex: `codex exec --sandbox read-only < review-bundle.md`
 3. Parse verdict; run:
    ```bash
    core/scripts/apply-review-verdict.sh --repo … --issue … --pr … --verdict approved|changes_requested

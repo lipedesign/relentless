@@ -160,8 +160,8 @@ Leave full upstream process documentation out of this plugin.
 
 - Reviewer auto-assignment  
 - Richer ruleset applicator  
-- Full orchestrator/reviewer/documenter agent packs  
-- Status snapshot automation (PR15)  
+- Reviewer GitHub auto-assignment (still v1.1)  
+- Richer status snapshot automation beyond write-status-snapshot.sh  
 
 ---
 
@@ -190,3 +190,31 @@ Addressed in tree after Teste-relentless dogfood:
 ## 10. Epic + label taxonomy (2026-10-31)
 
 Shipped: expanded labels (type / epic / investigation / independence / severity / GitHub defaults; **no** complexity), `create-epic` / `add-sub-issue` / `create-issue --parent` / `close-epic`, `decompose-epic` skill, milestone guards (epic parent + sub-issue linkage), lohra-ts issue form (Proof → QA/dogfood), apollo-style milestone + epic understanding, investigation template.
+
+## 11. Repo setup / stack CI (2026-10-31) — v1.4.0
+
+Bootstrap prepares the consumer: stack detection, FAIL-closed or real `relentless-ci.yml`, idempotent AGENTS/CLAUDE blocks, epic issue form + blank_issues disabled, `checks` in config, interactive `setup` / `/relentless:setup`.
+
+## 12. R3 dogfood friction (folded into v1.4.0)
+
+- merge-if-ready retargets open PRs stacked on the head branch before --delete-branch (avoids base_ref_deleted).
+- Reviewer prompts via stdin/file; Claude stream-json requires --verbose; run-isolated-review.sh for self-sufficient orchestrator loop.
+- Isolation hook strips heredoc bodies to avoid false positives on docs text.
+- Codex: prefer Write/apply_patch over huge shell heredocs in nested sessions.
+
+## 13. v1.4.0 include completion (2026-10-31)
+
+Shipped against §1 inventory:
+
+| ID | Practice | In tree |
+|----|----------|---------|
+| PR1–3,5,7,11,16 | Issue/milestone/epic/human-gate/review-merge/labels/dogfood | yes (prior) |
+| PR4 | Decision records | yes — `docs/decisions/`, templates, `new-adr`/`accept-adr`/`decide --adr`, bootstrap seed, dogfood ADR 0001–0002 |
+| PR6 | Named roles | yes — orchestrator + documenter + existing |
+| PR9 | Worktree per writer | yes — skill + create/cleanup + hooks + implementer briefs |
+| PR10 | Conventional commits + Closes #N | yes — doctrine + `check-commit-msg.sh` |
+| PR12 | External content = data | yes — AGENTS + agent briefs + seeded blocks |
+| PR13 | Explicit named failure | yes — doctrine; scripts annotate intentional fail-soft |
+| PR14 | Follow-ups after review | yes — `follow-up-after-review.md` |
+| PR15 | Status snapshot | yes — template + `write-status-snapshot.sh` |
+| Hooks | stop-gate / protect-main / protect-worktree-write | yes |

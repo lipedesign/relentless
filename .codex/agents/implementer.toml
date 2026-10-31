@@ -1,5 +1,4 @@
 name = "implementer"
-description = "Implement AC; stop at state:review. Never self-review or merge. Needs full sandbox bypass for git/gh."
-# Launch: codex exec --dangerously-bypass-approvals-and-sandbox --dangerously-bypass-hook-trust
-# export RELENTLESS_ROLE=implementer
-# Full brief: agents/implementer.md
+description = "Implement AC in own worktree; stop at state:review. Never self-review/merge. Full brief: agents/implementer.md"
+# Launch notes: see docs/harness-profiles.md and agents/implementer.md
+# Codex has no Stop hooks — honor stop-gate / protect-main / worktree rules as instructions.

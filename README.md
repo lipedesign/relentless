@@ -2,71 +2,74 @@
 
 Reusable **agent workflow plugin** for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [Codex CLI](https://github.com/openai/codex) (verified against **codex-cli 0.165.x**): GitHub issues & milestones as product outcomes, human decision gates, configurable merge policy, isolated reviewer, **agent auto-merge**.
 
-Do **not** copy plugin `agents/` or `skills/` into consumer repos — install the plugin.
+Do **not** copy plugin `agents/` or `skills/` into consumer repos — install the plugin, then **set up the repo**.
 
 ## Install (Claude Code) — headless CLI
 
-Prefer **project scope** so the repo records the plugin in `.claude/settings.json` (`enabledPlugins`) and collaborators get prompted:
+Prefer **project scope** so the repo records the plugin in `.claude/settings.json`:
 
 ```bash
 claude plugin marketplace add marcelusfernandes/relentless
 claude plugin install relentless@relentless --scope project -y
-# scopes from `claude plugin install --help`: user | project | local  (default: user)
 ```
-
-User-scope (this machine only): omit `--scope` or pass `--scope user`. Interactive: `/plugin install relentless --marketplace marcelusfernandes/relentless`.
-
-**Dogfood tip:** `claude -p` buffers stdout when redirected to a file. Prefer:
-
-```bash
-claude -p --output-format stream-json --dangerously-skip-permissions "…"
-```
-
-Find scripts: `claude plugin list --json` → `installPath` → export `RELENTLESS_ROOT=…`.
 
 ## Install (Codex CLI) — headless CLI
 
-As of **codex-cli 0.165.x**, `codex plugin add` has **no** `--scope` / project-scope flag (verified via `codex plugin add --help`). Plugins are enabled in the user config (`~/.codex/config.toml`). Do not invent a project install — each collaborator runs:
+As of **codex-cli 0.165.x**, no project-scope flag — each collaborator:
 
 ```bash
 codex plugin marketplace add marcelusfernandes/relentless
 codex plugin add relentless@relentless
-codex plugin marketplace upgrade relentless   # after updates
 ```
 
-Local path: `codex plugin marketplace add /absolute/path/to/relentless` then `codex plugin add relentless@relentless`.
+Canonical scripts path: `~/.codex/plugins/cache/relentless/relentless/<version>/` (or Claude `installPath`). Export `RELENTLESS_ROOT`.
 
-Confirm with `codex plugin list` (verbose — dumps curated catalog; look for `relentless@relentless` enabled). Canonical scripts path:
+## Prepare a consumer repo (required)
 
-`~/.codex/plugins/cache/relentless/relentless/<version>/` (prefer over `.tmp/marketplaces`).
+Installing the plugin alone is not enough. Run **setup** so the target repo gets labels, real CI, docs, and issue forms:
 
-Start a **new** Codex session after install.
+- Claude: **`/relentless:setup`** (skill `setup`)
+- Codex: invoke skill **`setup`**
+- Or scripts directly:
 
-## Quick start (target repo)
+```bash
+gh auth refresh -s workflow
+./core/scripts/bootstrap.sh --check-scopes
+./core/scripts/bootstrap.sh --repo OWNER/NAME --workdir /path/to/checkout \
+  --merge-default human --decider YourName --harness both
+# review plan, then:
+./core/scripts/bootstrap.sh --repo OWNER/NAME --workdir /path/to/checkout \
+  --merge-default human --decider YourName --harness both --apply
+```
 
-1. Install the plugin (Claude: `--scope project`; Codex: user-level — see above).
-2. `gh auth refresh -s workflow` then `./core/scripts/bootstrap.sh --check-scopes`
-3. Bootstrap (empty repos get an initial commit on `--apply`):
-   ```bash
-   ./core/scripts/bootstrap.sh --repo OWNER/NAME --workdir /path/to/checkout \
-     --merge-default auto --decider Marcelus --harness both
-   ./core/scripts/bootstrap.sh --repo OWNER/NAME --workdir /path/to/checkout \
-     --merge-default auto --decider Marcelus --harness claude --apply
-   ```
-   `--harness claude|codex|both` (default `both`) controls whether `.codex/agents/*.toml` stubs are seeded. Never vendors plugin `agents/`/`skills/`.
-4. Create outcome milestone → **epic parent** → sub-issues:
-   ```bash
-   ./core/scripts/create-milestone.sh --repo OWNER/NAME --title "Theme: subtitle" \
-     --outcome "…" --exit-criterion "…"
-   ./core/scripts/create-epic.sh --repo OWNER/NAME --title "… understanding" \
-     --milestone "Theme: subtitle" --outcome "…" --exit-criterion "…"
-   ./core/scripts/create-issue.sh --repo OWNER/NAME --title "feat: …" \
-     --milestone "Theme: subtitle" --type enhancement --parent N --label merge:auto
-   ```
-   ```
-5. Implement → QA → **stop at `state:review`** → isolated reviewer → `apply-review-verdict` → **`merge-if-ready`**.
+### What setup / bootstrap does
 
-Harness profiles: **`docs/harness-profiles.md`**. Deferred: **`docs/deferred-v1.1.md`**.
+| Piece | Behavior |
+|-------|----------|
+| **Stack detection** | Node (lockfile → npm/pnpm/yarn/bun + scripts), Python, Go, Rust; else `unknown` |
+| **CI** | Writes `.github/workflows/relentless-ci.yml` with detected commands. If unknown / no test → workflow **fails** with a clear message (never a silent pass). Leaves other workflows alone. |
+| **merge.default** | Forced to `human` when checks are weak, unless you pass `--merge-default auto` explicitly |
+| **Config** | `.relentless/config.json` includes `stack` + `checks.{install,lint,typecheck,test,build}` |
+| **AGENTS.md / CLAUDE.md** | Upserts a `<!-- relentless:start -->` … `<!-- relentless:end -->` block (idempotent; does not skip existing files) |
+| **Issue forms** | `relentless.yml`, `investigation.yml`, **`epic.yml`**, `config.yml` with `blank_issues_enabled: false` |
+| **Labels** | Idempotent create/edit |
+
+Setup then commits seeds on `chore/relentless-setup` and opens a PR (empty repos may seed `main` first).
+
+## Quick start after setup
+
+```bash
+./core/scripts/create-milestone.sh --repo OWNER/NAME --title "Theme: subtitle" \
+  --outcome "…" --exit-criterion "…"
+./core/scripts/create-epic.sh --repo OWNER/NAME --title "… understanding" \
+  --milestone "Theme: subtitle" --outcome "…" --exit-criterion "…"
+./core/scripts/create-issue.sh --repo OWNER/NAME --title "feat: …" \
+  --milestone "Theme: subtitle" --type enhancement --parent N --label merge:auto
+```
+
+Implement → QA → **stop at `state:review`** → isolated reviewer → `apply-review-verdict` → **`merge-if-ready`**.
+
+Harness profiles: **`docs/harness-profiles.md`**. Plan / backlog: **`docs/PLAN.md`**.
 
 ## Layout
 
@@ -84,3 +87,9 @@ docs/                              harness profiles, deferred, PLAN
 ## License
 
 MIT
+
+## Decision records & worktrees
+
+- Durable choices live in `docs/decisions/` (ADR = human gate via `/decide`; notes = no gate). Agents read them before plan/implement.
+- Each implementer works in its own git worktree (`skills/worktree-segura`, `worktree-create.sh`) on `<type>/<n>-<slug>` from `origin/main`.
+

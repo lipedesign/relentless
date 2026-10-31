@@ -1,0 +1,4 @@
+name = "orchestrator"
+description = "Drive wave: worktree implementer → isolated review → merge. Self-sufficient. Full brief: agents/orchestrator.md"
+# Launch notes: see docs/harness-profiles.md and agents/orchestrator.md
+# Codex has no Stop hooks — honor stop-gate / protect-main / worktree rules as instructions.

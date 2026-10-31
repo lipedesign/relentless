@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# pretool-protect-worktree-write.sh — PreToolUse Edit|Write|MultiEdit|NotebookEdit
+# When RELENTLESS_WORKTREE or .relentless/worktree.json or RELENTLESS_ROLE=implementer:
+# deny writes whose path resolves outside the worktree root.
+set -euo pipefail
+INPUT="$(cat 2>/dev/null || true)"  # intentional: empty stdin ok
+
+is_wt=0
+[[ "${RELENTLESS_ROLE:-}" == "implementer" || -n "${RELENTLESS_WORKTREE:-}" ]] && is_wt=1
+CWD=""
+FILE=""
+if command -v jq >/dev/null 2>&1 && [[ -n "$INPUT" ]]; then
+  CWD="$(printf '%s' "$INPUT" | jq -r '.cwd // empty' 2>/dev/null || true)"  # intentional fail-soft
+  FILE="$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // .file_path // empty' 2>/dev/null || true)"  # intentional fail-soft
+fi
+CWD="${CWD:-${CLAUDE_PROJECT_DIR:-$(pwd)}}"
+cd "$CWD" 2>/dev/null || true  # intentional fail-soft
+
+TOP=""
+if git rev-parse --show-toplevel >/dev/null 2>&1; then
+  TOP="$(git rev-parse --show-toplevel)"
+fi
+if [[ -n "$TOP" && -f "$TOP/.relentless/worktree.json" ]]; then is_wt=1; fi
+[[ "$is_wt" -eq 0 ]] && exit 0
+[[ -z "$FILE" ]] && exit 0
+[[ -z "$TOP" ]] && TOP="${RELENTLESS_WORKTREE:-$CWD}"
+
+# Resolve absolute path (best-effort, no symlink escape for v1)
+case "$FILE" in
+  /*) ABS="$FILE" ;;
+  *) ABS="$(cd "$CWD" 2>/dev/null && realpath -m "$FILE" 2>/dev/null || echo "$CWD/$FILE")" ;;
+esac
+TOP_REAL="$(realpath -m "$TOP" 2>/dev/null || echo "$TOP")"
+
+case "$ABS" in
+  "$TOP_REAL"|"$TOP_REAL"/*) exit 0 ;;
+  *)
+    printf 'protect-worktree: BLOCKED — write path %s is outside worktree %s\n' "$ABS" "$TOP_REAL" >&2
+    exit 2
+    ;;
+esac

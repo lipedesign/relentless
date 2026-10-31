@@ -16,7 +16,7 @@ done
 
 ISSUE_BODY="$(gh issue view "$ISSUE" --repo "$REPO" --json body,title -q '"# \(.title)\n\n\(.body)"')"
 PR_META="$(gh pr view "$PR" --repo "$REPO" --json body,title -q '"# PR: \(.title)\n\n\(.body)"')"
-DIFF_RAW="$(gh pr diff "$PR" --repo "$REPO" 2>/dev/null || true)"
+DIFF_RAW="$(gh pr diff "$PR" --repo "$REPO" 2>/dev/null || true)"  # intentional fail-soft
 # Strip lockfile diffs (package-lock.json, pnpm-lock.yaml, yarn.lock, Cargo.lock, poetry.lock, go.sum)
 DIFF_FILTERED="$(printf '%s\n' "$DIFF_RAW" | awk '
   BEGIN { skip=0 }

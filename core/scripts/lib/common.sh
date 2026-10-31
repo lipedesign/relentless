@@ -17,7 +17,7 @@ resolve_config() {
     return 0
   fi
   local root
-  root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  root="$(git rev-parse --show-toplevel 2>/dev/null || true)"  # intentional fail-soft
   if [[ -n "$root" && -f "${root}/.relentless/config.json" ]]; then
     echo "${root}/.relentless/config.json"
     return 0
@@ -70,12 +70,12 @@ set_issue_state() {
 
 check_gh_workflow_scope() {
   local status scopes
-  status="$(gh auth status 2>&1 || true)"
+  status="$(gh auth status 2>&1 || true)"  # intentional fail-soft
   if echo "$status" | grep -qiE "Token scopes:.*['\"]workflow['\"]|scopes:.*workflow"; then
     echo "gh scopes: workflow present"
     return 0
   fi
-  scopes="$(gh api -i -X GET /user 2>&1 | grep -i '^x-oauth-scopes:' || true)"
+  scopes="$(gh api -i -X GET /user 2>&1 | grep -i '^x-oauth-scopes:' || true)"  # intentional fail-soft
   if echo "$scopes" | grep -qw workflow; then
     echo "gh scopes: workflow present"
     return 0
@@ -90,7 +90,7 @@ check_gh_workflow_scope() {
 resolve_merge_mode() {
   local repo="$1" issue="$2" config="${3:-}"
   local labels
-  labels="$(gh api "repos/${repo}/issues/${issue}" --jq '[.labels[].name] | join("\n")' 2>/dev/null || true)"
+  labels="$(gh api "repos/${repo}/issues/${issue}" --jq '[.labels[].name] | join("\n")' 2>/dev/null || true)"  # intentional fail-soft
   if echo "$labels" | grep -Fxq "merge:human"; then
     echo "human"; return 0
   fi

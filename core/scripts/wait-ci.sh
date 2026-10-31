@@ -17,7 +17,7 @@ BRANCH="$(gh pr view "$PR" --repo "$REPO" --json headRefName -q .headRefName)"
 deadline=$((SECONDS + TIMEOUT))
 while (( SECONDS < deadline )); do
   # Prefer run watch once a run exists
-  RUN="$(gh run list --repo "$REPO" --branch "$BRANCH" --limit 1 --json databaseId,status -q '.[0].databaseId // empty' 2>/dev/null || true)"
+  RUN="$(gh run list --repo "$REPO" --branch "$BRANCH" --limit 1 --json databaseId,status -q '.[0].databaseId // empty' 2>/dev/null || true)"  # intentional fail-soft
   if [[ -n "$RUN" ]]; then
     echo "watching run $RUN on $BRANCH"
     if gh run watch "$RUN" --repo "$REPO" --exit-status; then

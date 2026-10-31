@@ -28,7 +28,7 @@ LABELS="$(gh api "repos/${REPO}/issues/${EPIC}" --jq '[.labels[].name] | join(",
 echo "$LABELS" | grep -qw epic || die "#${EPIC} is not labeled epic"
 
 OPEN_SUBS="$(gh api "repos/${REPO}/issues/${EPIC}/sub_issues?per_page=100" \
-  --jq '[.[] | select(.state=="open") | "#\(.number) \(.title)"] | .[]' 2>/dev/null || true)"
+  --jq '[.[] | select(.state=="open") | "#\(.number) \(.title)"] | .[]' 2>/dev/null || true)"  # intentional fail-soft
 
 if [[ -n "$OPEN_SUBS" && "$FORCE" -eq 0 ]]; then
   echo "refuse: epic #${EPIC} still has open sub-issues:" >&2
@@ -38,5 +38,5 @@ fi
 
 gh issue close "$EPIC" --repo "$REPO" --reason completed
 # Best-effort state:done
-"${SCRIPT_DIR}/set-state.sh" --repo "$REPO" --issue "$EPIC" --state "done" 2>/dev/null || true
+"${SCRIPT_DIR}/set-state.sh" --repo "$REPO" --issue "$EPIC" --state "done" 2>/dev/null || true  # intentional fail-soft
 echo "closed epic #${EPIC}"
