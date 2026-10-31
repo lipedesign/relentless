@@ -20,7 +20,7 @@ tools: Read, Grep, Glob, Bash
 ## Process
 1. Restate acceptance criteria as a checklist.
 2. Walk the diff against each criterion.
-3. If the area has an **accepted ADR**, require the PR body or commits to reference `docs/decisions/adr/NNNN-…`. Missing reference → `changes_requested` (or major finding).
+3. Require the `ADRs:` line in the PR body. Missing line, or `"none"` when the diff touches an area covered by an accepted ADR → `changes_requested`. If the area has an **accepted ADR**, require the PR body or commits to reference `docs/decisions/adr/NNNN-…`.
 4. Read QA — if missing/failing, prefer `changes_requested` unless criteria are clearly met by the diff alone.
 5. Emit the verdict. Prefer letting the **orchestrator** run `apply-review-verdict.sh`.
 
@@ -36,7 +36,9 @@ tools: Read, Grep, Glob, Bash
 `approved` | `changes_requested`
 
 ## Findings
-1. **[severity|major|minor|nit]** … (file/line if possible)
+1. **[blocker|major|minor|nit]** … (file/line if possible)
+
+Verdict rule: any blocker or major finding, any unmet acceptance criterion, a missing `ADRs:` line, or failing QA → `changes_requested`. Only minor/nit findings → `approved`; list them as follow-ups.
 
 ## Acceptance criteria coverage
 - [ ] Criterion … — met | unmet | unclear

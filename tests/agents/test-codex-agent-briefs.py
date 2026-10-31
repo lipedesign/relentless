@@ -33,6 +33,9 @@ CODEX_REQUIRED = {
         "worktree",
         "main",
         "never force-push",
+        "run-isolated-review.sh",
+        ".relentless/config.json",
+        "--harness",
     ],
     "planner": [
         "do not run /decide",
@@ -63,6 +66,11 @@ CODEX_REQUIRED = {
         "own terminal",
         "do not retry",
         "origin/main",
+        "docs/decisions",
+        "adrs:",
+        "stash",
+        "stop-gate",
+        "uncommitted",
     ],
     "reviewer": [
         "read-only",
@@ -77,6 +85,10 @@ CODEX_REQUIRED = {
         "decide.sh",
         "decided by",
         "decider.name",
+        "blocker",
+        "adrs:",
+        "verdict rule",
+        "follow-ups",
     ],
     "qa": [
         "dogfood",

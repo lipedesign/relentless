@@ -4,6 +4,10 @@
 ## Linked issue
 Closes #
 
+## ADRs
+ADRs: none (<reason>)
+<!-- or: ADRs: docs/decisions/adr/NNNN-slug.md[, …] -->
+
 ## Test plan
 - [ ]
 
