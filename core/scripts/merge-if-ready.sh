@@ -4,6 +4,12 @@
 # auto: require CI green on head SHA + review:approved → merge commit, state:done, close issue.
 # human: post 🤖 ready-to-merge and exit 0 without merging.
 #
+# Before either of those, refuses (exit 1, labels unchanged, no merge) unless the PR
+# body has exactly one ADRs: line:
+#   ADRs: docs/decisions/adr/NNNN-slug.md[, …]   (each path must exist at the PR head)
+#   ADRs: none (<reason>)
+# Also refuses an accepted ADR in the diff when the linked issue has no decision-request.
+#
 # Before deleting the merged head branch, retargets open PRs that used it as base
 # (avoids GitHub closing dependents with base_ref_deleted).
 #
@@ -57,6 +63,87 @@ HEAD_REF="$(jq -r .headRefName <<<"$PR_JSON")"
 BASE_REF="$(jq -r .baseRefName <<<"$PR_JSON")"
 echo "head SHA: $HEAD_SHA (branch=$HEAD_REF → $BASE_REF)"
 
+# Exactly one ADRs: line, checked before merge:human and merge:auto.
+# A refusal exits 1 and does not add, remove, or replace labels (including review:approved).
+check_pr_adrs_line() {
+  local body rc line trimmed rest reason path got n raw old_ifs
+  local -a decl paths
+  set +e
+  body="$(gh pr view "$PR" --repo "$REPO" --json body -q .body 2>/dev/null)"
+  rc=$?
+  set -e
+  if [[ $rc -ne 0 ]]; then
+    echo "error: could not read PR #${PR} body; refusing merge (ADRs: line)." >&2
+    exit 1
+  fi
+  body="${body//$'\r'/}"
+  # gh --jq prints the JSON token null when the body field is JSON null.
+  if [[ "$body" == "null" ]]; then
+    body=""
+  fi
+  decl=()
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    trimmed="${line#"${line%%[![:space:]]*}"}"
+    if [[ "$trimmed" == ADRs:* ]]; then
+      decl+=("$trimmed")
+    fi
+  done <<<"$body"
+  n=${#decl[@]}
+  if [[ "$n" -eq 0 ]]; then
+    echo "error: PR #${PR} body is missing the required ADRs: line. Refusing merge." >&2
+    echo "Required exactly once: \`ADRs: docs/decisions/adr/NNNN-slug.md[, …]\` or \`ADRs: none (<reason>)\`." >&2
+    exit 1
+  fi
+  if [[ "$n" -gt 1 ]]; then
+    echo "error: PR #${PR} body contains the ADRs: line more than once (${n} lines). Refusing merge." >&2
+    exit 1
+  fi
+  rest="${decl[0]#ADRs:}"
+  rest="${rest#"${rest%%[![:space:]]*}"}"
+  rest="${rest%"${rest##*[![:space:]]}"}"
+  if [[ "$rest" == none || "$rest" == none\ * || "$rest" == none\(* ]]; then
+    reason=""
+    if [[ "$rest" =~ ^none[[:space:]]+\((.*)\)$ ]]; then
+      reason="${BASH_REMATCH[1]}"
+      reason="${reason#"${reason%%[![:space:]]*}"}"
+      reason="${reason%"${reason##*[![:space:]]}"}"
+    fi
+    if [[ -z "$reason" ]]; then
+      echo "error: PR #${PR} body has \`ADRs: none\` without a reason in parentheses. Refusing merge." >&2
+      echo "Use \`ADRs: none (<reason>)\`." >&2
+      exit 1
+    fi
+    return 0
+  fi
+  paths=()
+  old_ifs="$IFS"
+  IFS=','
+  read -r -a paths <<< "$rest"
+  IFS="$old_ifs"
+  if [[ ${#paths[@]} -eq 0 ]]; then
+    echo "error: PR #${PR} ADRs: line lists no ADR paths. Refusing merge." >&2
+    exit 1
+  fi
+  for raw in "${paths[@]}"; do
+    path="${raw#"${raw%%[![:space:]]*}"}"
+    path="${path%"${path##*[![:space:]]}"}"
+    if [[ ! "$path" =~ ^docs/decisions/adr/[0-9]{4}-[a-z0-9]+(-[a-z0-9]+)*\.md$ ]]; then
+      echo "error: PR #${PR} ADRs: line lists invalid path \`${path}\`. Refusing merge." >&2
+      echo "Expected \`docs/decisions/adr/NNNN-slug.md\` paths, or \`ADRs: none (<reason>)\`." >&2
+      exit 1
+    fi
+    set +e
+    got="$(gh api "repos/${REPO}/contents/${path}?ref=${HEAD_SHA}" --jq .path 2>/dev/null)"
+    rc=$?
+    set -e
+    if [[ $rc -ne 0 || "$got" != "$path" ]]; then
+      echo "error: ADRs: path ${path} does not exist at PR head ${HEAD_SHA}. Refusing merge." >&2
+      exit 1
+    fi
+  done
+  return 0
+}
+
 # Accepted ADRs introduced by this PR need a prior decision-request on the linked issue.
 # Agents can write "Decided by" themselves; GitHub cannot tell that account from the human.
 check_accepted_adr_decision_requests() {
@@ -100,6 +187,7 @@ check_accepted_adr_decision_requests() {
   return 0
 }
 
+check_pr_adrs_line
 check_accepted_adr_decision_requests
 
 wait_ci() {
