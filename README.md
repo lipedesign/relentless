@@ -73,9 +73,10 @@ Agents use the same GitHub account as the decider, so they must not record decis
 bash tests/hooks/test-hooks.sh
 bash tests/hooks/test-decide-guard.sh
 bash tests/hooks/test-githooks.sh
+python3 tests/agents/test-codex-agent-briefs.py
 ```
 
-CI runs the same three scripts (`.github/workflows/ci.yml`).
+CI runs the same scripts (`.github/workflows/ci.yml`). Codex has no Claude hooks, so `.codex/agents/*.toml` `developer_instructions` carry each `agents/*.md` brief. The Python check fails if a TOML drops a normative rule from its brief.
 
 ## Quick start after setup
 

@@ -6,6 +6,8 @@ Agents **must not** self-review. Use separate processes with different permissio
 
 ## Codex CLI
 
+Codex has no Claude PreToolUse or Stop hooks, and commands have no TTY even in the interactive TUI. The guard is `.codex/agents/<role>.toml` `developer_instructions`, derived from `agents/<role>.md` (worktree, stop at `state:review`, no commit or push on main, read-only reviewer, QA and documenter limits, and the decision rules). `tests/agents/test-codex-agent-briefs.py` fails if a TOML drops a normative line from its brief.
+
 ### Implementer / orchestrator (needs git + gh)
 ```bash
 codex exec \
@@ -14,7 +16,7 @@ codex exec \
   -C /path/to/workdir \
   < implementer-prompt.md
 ```
-Export `RELENTLESS_ROLE=implementer` so hooks block `review:approved` / `merge-if-ready` / `apply-review-verdict`.
+Export `RELENTLESS_ROLE=implementer`. Hooks are not present in Codex; the implementer TOML still forbids `review:approved`, `merge-if-ready`, and `apply-review-verdict`, and `decide.sh` refuses when that role is set.
 
 Prefer **Write / apply_patch** over huge `cat > file <<'EOF'` heredocs inside nested sessions — Codex shell classifiers can false-positive on heredoc bodies that look like dangerous commands.
 
@@ -116,6 +118,7 @@ Setup / `bootstrap.sh` installs `.relentless/githooks/pre-commit` and `pre-push`
 bash tests/hooks/test-hooks.sh          # PreToolUse protect-main, reviewer isolation, decide block
 bash tests/hooks/test-decide-guard.sh   # agent refusal, forged env, human PTY, UserPromptSubmit, merge ADR guard
 bash tests/hooks/test-githooks.sh       # core.hooksPath install, husky chain, main and force-push
+python3 tests/agents/test-codex-agent-briefs.py  # Codex TOML instructions cover agents/*.md
 ```
 
 CI (`.github/workflows/ci.yml`) runs the same scripts.
