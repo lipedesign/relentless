@@ -1,38 +1,24 @@
 ---
 name: bootstrap
-description: Install Relentless labels and seed consumer artifacts. Dry-run first unless user asks to apply. Empty repos get an initial commit. Supports --merge-default / --decider / --harness. Never vendors plugin agents/skills.
+description: Low-level Relentless seed (labels, stack CI, docs blocks). Prefer skill setup / /relentless:setup for interactive prep. Dry-run first unless user asks to apply.
 ---
 
-# Bootstrap
+# Bootstrap (low-level)
 
-## Before seeding — install the plugin (not copy files)
-Do **not** copy Relentless `agents/` or `skills/` into the consumer repo.
+Prefer **`setup`** for the full interactive flow (PR, plugin install, first epic).
 
-**Claude Code (prefer project scope — records `.claude/settings.json` for collaborators):**
 ```bash
-claude plugin marketplace add marcelusfernandes/relentless
-claude plugin install relentless@relentless --scope project -y
-```
-Scopes from `claude plugin install --help`: `user` | `project` | `local` (default `user`).
-
-**Codex CLI 0.165.x:** `codex plugin add` has **no** project-scope option (verified). User-level only:
-```bash
-codex plugin marketplace add marcelusfernandes/relentless
-codex plugin add relentless@relentless
+core/scripts/bootstrap.sh --check-scopes
+core/scripts/bootstrap.sh --repo OWNER/NAME --workdir PATH \
+  --merge-default human --decider NAME --harness both
+core/scripts/bootstrap.sh --repo OWNER/NAME --workdir PATH \
+  --merge-default human --decider NAME --harness both --apply
 ```
 
-## Steps
-1. `core/scripts/bootstrap.sh --check-scopes`
-2. Empty repos: with `--workdir --apply`, creates an initial README commit on `main` (unless `--no-init-empty`).
-3. Dry-run then apply:
-   ```bash
-   core/scripts/bootstrap.sh --repo OWNER/NAME --workdir PATH \
-     --merge-default auto --decider Marcelus --harness claude
-   core/scripts/bootstrap.sh --repo OWNER/NAME --workdir PATH \
-     --merge-default auto --decider Marcelus --harness claude --apply
-   ```
-4. `--harness claude|codex|both` (default `both`): `.codex/agents/*.toml` stubs only when harness is `codex` or `both`.
-5. Rulesets remain opt-in fail-soft.
-
-## Seeds
-`.relentless/config.json`, issue + PR templates, CI workflow, `AGENTS.md` / `CLAUDE.md` stubs, milestone example. Optional Codex agent tomls per `--harness`. Never `agents/` or `skills/` from the plugin.
+## Behavior (v1.4+)
+- Detects stack (node/python/go/rust) → writes `.github/workflows/relentless-ci.yml`
+- Unknown / no test → FAIL-closed CI + `merge.default=human` unless `--merge-default auto` explicit
+- Upserts `<!-- relentless:start -->` blocks in AGENTS.md / CLAUDE.md
+- Seeds issue forms including **epic** + `config.yml` (`blank_issues_enabled: false`)
+- Records `checks` + `stack` in `.relentless/config.json`
+- Never vendors plugin agents/skills

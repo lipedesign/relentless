@@ -1,0 +1,70 @@
+name: Epic (understanding)
+description: Parent issue-mãe for a milestone wave — create BEFORE sub-issues
+title: "epic: <Theme wave understanding>"
+labels: ["epic", "state:todo"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Planner creates this **first** in an outcome milestone, then links native sub-issues (`create-issue --parent` / `add-sub-issue`). Close only when all children are closed (`close-epic.sh`).
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Product outcome
+      description: Same outcome as the milestone (Theme: subtitle).
+    validations:
+      required: true
+  - type: textarea
+    id: exit
+    attributes:
+      label: Exit criterion / validates with
+      description: How we know the wave is done.
+    validations:
+      required: true
+  - type: textarea
+    id: deliverable
+    attributes:
+      label: Deliverable
+      description: What lands when this wave closes.
+  - type: textarea
+    id: depends
+    attributes:
+      label: Depends on
+      value: |
+        none
+  - type: textarea
+    id: understanding
+    attributes:
+      label: Understanding (context)
+      description: Problem/context grasped before decomposing. Cite real paths.
+    validations:
+      required: true
+  - type: textarea
+    id: decisions
+    attributes:
+      label: Decisions fixed for this wave
+      description: Locked decisions. Anything needing a human → human:pending + decision-request.
+      value: |
+        -
+    validations:
+      required: true
+  - type: textarea
+    id: plan
+    attributes:
+      label: Decomposition plan (waves)
+      description: Waves and dependencies. Nested work still too big → child epics.
+      value: |
+        ### Wave 1
+        -
+
+        ### Dependencies between sub-issues
+        -
+    validations:
+      required: true
+  - type: textarea
+    id: subs
+    attributes:
+      label: Sub-issue checklist
+      description: Filled as children are linked via REST sub_issues.
+      value: |
+        - [ ] #

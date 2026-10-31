@@ -190,3 +190,14 @@ Addressed in tree after Teste-relentless dogfood:
 ## 10. Epic + label taxonomy (2026-10-31)
 
 Shipped: expanded labels (type / epic / investigation / independence / severity / GitHub defaults; **no** complexity), `create-epic` / `add-sub-issue` / `create-issue --parent` / `close-epic`, `decompose-epic` skill, milestone guards (epic parent + sub-issue linkage), lohra-ts issue form (Proof → QA/dogfood), apollo-style milestone + epic understanding, investigation template.
+
+## 11. Repo setup / stack CI (2026-10-31) — v1.4.0
+
+Bootstrap prepares the consumer: stack detection, FAIL-closed or real `relentless-ci.yml`, idempotent AGENTS/CLAUDE blocks, epic issue form + blank_issues disabled, `checks` in config, interactive `setup` / `/relentless:setup`.
+
+## 12. R3 dogfood friction (folded into v1.4.0)
+
+- merge-if-ready retargets open PRs stacked on the head branch before --delete-branch (avoids base_ref_deleted).
+- Reviewer prompts via stdin/file; Claude stream-json requires --verbose; run-isolated-review.sh for self-sufficient orchestrator loop.
+- Isolation hook strips heredoc bodies to avoid false positives on docs text.
+- Codex: prefer Write/apply_patch over huge shell heredocs in nested sessions.

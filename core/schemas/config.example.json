@@ -17,5 +17,14 @@
   },
   "milestones": {
     "require_outcome_section": true
+  },
+  "stack": "unknown",
+  "package_manager": null,
+  "checks": {
+    "install": "",
+    "lint": "",
+    "typecheck": "",
+    "test": "",
+    "build": ""
   }
 }

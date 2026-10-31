@@ -2,14 +2,27 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Relentless project config",
   "type": "object",
-  "required": ["decider", "merge", "workers"],
+  "required": [
+    "decider",
+    "merge",
+    "workers"
+  ],
   "properties": {
     "decider": {
       "type": "object",
-      "required": ["name", "github"],
+      "required": [
+        "name",
+        "github"
+      ],
       "properties": {
-        "name": { "type": "string", "description": "Display name used in authorship markers" },
-        "github": { "type": "string", "description": "GitHub login to assign when human:pending" }
+        "name": {
+          "type": "string",
+          "description": "Display name used in authorship markers"
+        },
+        "github": {
+          "type": "string",
+          "description": "GitHub login to assign when human:pending"
+        }
       }
     },
     "workers": {
@@ -17,31 +30,84 @@
       "additionalProperties": {
         "type": "object",
         "properties": {
-          "github": { "type": "string" }
+          "github": {
+            "type": "string"
+          }
         },
-        "required": ["github"]
+        "required": [
+          "github"
+        ]
       },
       "description": "Named workers; assignee while state:in-progress"
     },
     "merge": {
       "type": "object",
-      "required": ["default"],
+      "required": [
+        "default"
+      ],
       "properties": {
-        "default": { "enum": ["auto", "human"] },
-        "allow_issue_override": { "type": "boolean", "default": true }
+        "default": {
+          "enum": [
+            "auto",
+            "human"
+          ]
+        },
+        "allow_issue_override": {
+          "type": "boolean",
+          "default": true
+        }
       }
     },
     "rulesets": {
       "type": "object",
       "properties": {
-        "apply": { "type": "boolean", "default": false, "description": "Opt-in; fail soft if API denies" }
+        "apply": {
+          "type": "boolean",
+          "default": false,
+          "description": "Opt-in; fail soft if API denies"
+        }
       }
     },
     "milestones": {
       "type": "object",
       "properties": {
-        "require_outcome_section": { "type": "boolean", "default": true }
+        "require_outcome_section": {
+          "type": "boolean",
+          "default": true
+        }
       }
+    },
+    "stack": {
+      "type": "string",
+      "description": "Detected stack: node|python|go|rust|unknown"
+    },
+    "package_manager": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "npm|pnpm|yarn|bun when stack=node"
+    },
+    "checks": {
+      "type": "object",
+      "properties": {
+        "install": {
+          "type": "string"
+        },
+        "lint": {
+          "type": "string"
+        },
+        "typecheck": {
+          "type": "string"
+        },
+        "test": {
+          "type": "string"
+        },
+        "build": {
+          "type": "string"
+        }
+      },
+      "description": "Commands Relentless wrote into relentless-ci.yml"
     }
   }
 }

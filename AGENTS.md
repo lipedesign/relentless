@@ -71,18 +71,29 @@ The implementer **stops at `state:review`**. It must **not**:
 
 Hooks soft-block these when `RELENTLESS_ROLE=implementer` or the same bash mixes push + review:approved.
 
-### Isolated REVIEWER
-Orchestrator **must** start the reviewer as a **separate** subagent / fresh session.
+### Isolated REVIEWER (orchestrator spawns — no human resume)
+After `state:review`, the **orchestrator itself** spawns the isolated reviewer, applies the verdict, and continues to merge. **Do not** stop for a human/driver to wire the handoff.
 
-**Pass ONLY** (use `build-review-bundle.sh` — lockfiles excluded):
-1. Issue text (acceptance criteria)
-2. PR diff (no `package-lock.json` / yarn.lock / etc.)
-3. QA / dogfood section
+Prefer the helper (bundle via file/stdin, never argv):
 
-- Claude: `claude -p --agent relentless:reviewer "$(cat review-bundle.md)"`
-- Codex: `codex exec --sandbox read-only "$(cat review-bundle.md)"`
+```bash
+core/scripts/run-isolated-review.sh --repo OWNER/NAME --pr N --issue N \
+  --harness claude --workdir . --merge
+# Codex: --harness codex
+```
 
-Reviewer is **read-only**. Orchestrator applies verdict via `apply-review-verdict.sh`.
+Or manually:
+
+1. `build-review-bundle.sh … --out review-bundle.md` (lockfiles excluded)
+2. **Pass the bundle via stdin / file — never `$(cat bundle)` as argv** (large diffs fail):
+   - Claude: `claude -p --agent relentless:reviewer --verbose --output-format stream-json < review-bundle.md`
+     (`--output-format stream-json` **requires** `--verbose` on Claude Code 2.1.x+)
+   - Codex: `codex exec --sandbox read-only -C . < review-bundle.md`
+     (Prefer Write/apply_patch inside nested sessions; huge `cat <<EOF` heredocs can false-positive Codex shell classifiers.)
+3. `apply-review-verdict.sh … --verdict approved|changes_requested`
+4. If approved → **immediately** `merge-if-ready.sh` (do not stall)
+
+Reviewer is **read-only**. Only AC + PR diff + QA — no implementer chat.
 
 ### FINAL step — merge-if-ready
 After `approved`, orchestrator **must** run (do not stall at approved-but-unmerged):
@@ -91,10 +102,10 @@ After `approved`, orchestrator **must** run (do not stall at approved-but-unmerg
 core/scripts/merge-if-ready.sh --repo OWNER/NAME --pr N --issue N
 ```
 
-- `merge:auto` / config default `auto`: CI green on head SHA + `review:approved` → **merge commit** (`gh pr merge --merge`) → `state:done` → close issue
+- `merge:auto` / config default `auto`: CI green on head SHA + `review:approved` → retarget open PRs stacked on the head branch → **merge commit** (`gh pr merge --merge`) → delete branch only if safe → `state:done` → close issue
 - `merge:human`: post 🤖 ready-to-merge and wait
 
-CI wait: prefer `wait-ci.sh` / `gh run watch` after a run id exists (avoids `gh pr checks` “no checks reported” race).
+CI wait: prefer `wait-ci.sh` / `gh run watch` after a run id exists (avoids `gh pr checks` "no checks reported" race).
 
 ## Merge policy
 - Default: `.relentless/config.json` → `merge.default` (`auto` | `human`)
@@ -117,23 +128,25 @@ core/scripts/check-milestone-pending.sh --repo OWNER/NAME --milestone N
 ## Dogfood QA
 `qa` agent + `dogfood-qa` skill. Prefer `fill-qa-section.sh`. README must match shipped features before milestone close.
 
-## Bootstrap
+## Setup / Bootstrap
+Prefer skill **`setup`** / `/relentless:setup` (interactive → dry-run → apply → PR). Low-level:
+
 ```bash
 core/scripts/bootstrap.sh --check-scopes
 core/scripts/bootstrap.sh --repo OWNER/NAME --workdir PATH \
-  --merge-default auto --decider Marcelus --harness both          # dry-run
+  --merge-default human --decider Marcelus --harness both          # dry-run
 core/scripts/bootstrap.sh --repo OWNER/NAME --workdir PATH \
-  --merge-default auto --decider Marcelus --harness claude --apply
+  --merge-default human --decider Marcelus --harness claude --apply
 ```
 
-`--harness claude|codex|both` (default `both`): seeds `.codex/agents/*.toml` only for `codex`/`both`. **Never** vendor plugin `agents/` or `skills/` into the consumer — install the plugin.
+Stack detection writes real `relentless-ci.yml` (or FAIL-closed if no test). Upserts `<!-- relentless:start -->` docs blocks. Seeds epic + investigation issue forms. **Never** vendor plugin `agents/`/`skills/`.
 
 ## Plugin install (do not copy agents/skills)
 - **Claude (prefer project scope):** `claude plugin install relentless@relentless --scope project -y` after `marketplace add` — writes `.claude/settings.json` `enabledPlugins` so collaborators are prompted.
 - **Codex 0.165.x:** no project-scope flag on `codex plugin add` (user-level `~/.codex/config.toml` only). Each collaborator runs `codex plugin marketplace add` + `codex plugin add`.
 
 ## Headless / CLI notes
-- Claude: `claude -p` buffers stdout when redirected — use `--output-format stream-json` for dogfoods.
+- Claude: `claude -p` buffers stdout when redirected — use `--output-format stream-json` **with `--verbose`** (required on 2.1.x+). Pass large prompts via **stdin**, not argv.
 - Codex: `codex plugin list` is very verbose (curated catalog); confirm install amid noise or parse JSON if available. Prefer `~/.codex/plugins/cache/relentless/relentless/<ver>/` as `RELENTLESS_ROOT`.
 - See `docs/harness-profiles.md` and `docs/deferred-v1.1.md`.
 
