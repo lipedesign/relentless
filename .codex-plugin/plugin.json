@@ -1,8 +1,11 @@
 {
   "name": "relentless",
-  "version": "1.0.0",
-  "description": "Reusable agent workflow for Codex: GitHub issues/milestones as product outcomes, human decision gates, configurable merge policy.",
+  "version": "1.1.0",
+  "description": "Reusable agent workflow for Codex: GitHub issues/milestones as product outcomes, human decision gates, configurable merge policy, isolated reviewer.",
   "author": {
     "name": "Marcelus Fernandes"
-  }
+  },
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json",
+  "agents": "./.codex/agents/"
 }

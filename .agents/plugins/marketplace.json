@@ -1,0 +1,21 @@
+{
+  "name": "relentless",
+  "interface": {
+    "displayName": "Relentless"
+  },
+  "plugins": [
+    {
+      "name": "relentless",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity",
+      "description": "Agent workflow: GitHub issues/milestones as outcomes, human gates, merge policy (Claude + Codex)."
+    }
+  ]
+}

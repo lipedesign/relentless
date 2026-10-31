@@ -1,0 +1,4 @@
+name = "reviewer"
+description = "Isolated agnostic reviewer. Fresh context: issue acceptance criteria + PR diff + QA/dogfood only. Read-only. Structured verdict."
+# Full instructions: agents/reviewer.md
+# Isolation: orchestrator must spawn a separate `codex exec` (or `codex review`) with ONLY those inputs — never the implementer thread.

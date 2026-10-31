@@ -173,3 +173,17 @@ Leave full upstream process documentation out of this plugin.
 - Merging the scaffold PR without human review  
 - Proof/provas surfaces  
 - Shipping Product Upstream inside Relentless  
+
+---
+
+## 9. Dogfood friction follow-up (2026-10-31)
+
+Addressed in tree after Teste-relentless dogfood:
+
+- Bootstrap: `--check-scopes`, `workflow` guidance, seed files + CI template, empty-repo warning
+- State labels: swap-only via `lib/common.sh` / `set-state.sh`
+- `create-issue.sh` resolves milestone by number
+- Isolated `reviewer` agent (Claude + Codex) + orchestrator doctrine
+- Milestone must not close with open `human:pending`
+- Hooks enforce (PreToolUse exit 2) for pending/decide misuse
+- Codex install via `.agents/plugins/marketplace.json` + `codex plugin marketplace add` / `codex plugin add`

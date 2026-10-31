@@ -1,0 +1,14 @@
+{
+  "name": "relentless",
+  "owner": {
+    "name": "Marcelus Fernandes"
+  },
+  "plugins": [
+    {
+      "name": "relentless",
+      "source": "./",
+      "description": "Agent workflow plugin (Claude Code + Codex): issues, milestones as outcomes, human gates, merge policy."
+    }
+  ],
+  "description": "Relentless agent-workflow plugins for Claude Code and Codex."
+}
