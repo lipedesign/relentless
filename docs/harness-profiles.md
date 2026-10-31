@@ -76,7 +76,7 @@ export RELENTLESS_ROOT="<installPath>"
 
 # Codex — prefer cache path, not .tmp marketplaces clone
 # ~/.codex/plugins/cache/relentless/relentless/<version>/
-export RELENTLESS_ROOT=~/.codex/plugins/cache/relentless/relentless/1.4.1
+export RELENTLESS_ROOT=~/.codex/plugins/cache/relentless/relentless/1.4.3
 ```
 
 ## Project-scoped plugin install
