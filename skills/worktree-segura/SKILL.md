@@ -38,7 +38,7 @@ Optional: `--parent DIR`, `--path DIR`, `--base main`, `--dry-run`, `--no-push`.
 - Conflict with main on a published branch: `git fetch origin && git merge origin/main` (rebase of published branches is blocked by protect-main).
 
 ## D. Stop / end of turn
-Stop-gate refuses ending with uncommitted changes in a Relentless worktree. Commit or stash is not allowed — commit intentional checkpoints, or leave the turn open.
+Stop-gate refuses ending the turn with uncommitted changes in a Relentless worktree. git stash is forbidden. Commit an intentional checkpoint, or keep the turn open until you can.
 
 ## E. After merge
 Orchestrator / merge-if-ready cleans up:

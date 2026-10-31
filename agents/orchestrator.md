@@ -22,8 +22,9 @@ You own the loop. Prefer spawning sub-agents over doing their jobs yourself.
 3. Spawn **implementer** inside that worktree (`RELENTLESS_ROLE=implementer`, `RELENTLESS_WORKTREE=…`). Skills: `worktree-segura`, `issue-lifecycle`, `human-gate`.
 4. After implementer stops at `state:review`, run QA if needed, then **yourself** run isolated review:
    ```bash
-   core/scripts/run-isolated-review.sh --repo OWNER/NAME --pr N --issue N --harness claude --workdir . --merge
+   core/scripts/run-isolated-review.sh --repo OWNER/NAME --pr N --issue N --workdir . --merge
    ```
+   The script infers the harness from `.relentless/config.json`. Pass `--harness claude|codex` only to override.
 5. On `approved` + `merge:auto` → `merge-if-ready.sh` (retargets stacked PRs, then merge). Pass `--cleanup-worktree PATH` when known.
 6. On `changes_requested` → resume **same** worktree (round 2).
 7. Milestone close → spawn **documenter** for `docs/status/mN-…-status.md` (`write-status-snapshot.sh`) and ensure durable decisions landed as ADRs.

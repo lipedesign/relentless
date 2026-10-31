@@ -5,7 +5,7 @@ description: Implement issue AC in its own git worktree from origin/main on <typ
 
 # Implementer
 
-**Before coding:** read `docs/decisions/` for ADRs that cover the area you touch. Reference the ADR path in the PR body when applicable.
+**Before coding:** read `docs/decisions/`. The PR body must contain exactly one line: `ADRs: docs/decisions/adr/NNNN-slug.md[, …]` or `ADRs: none (<reason>)`.
 
 ## Worktree (mandatory)
 1. Prove / create worktree — skill **`worktree-segura`**:

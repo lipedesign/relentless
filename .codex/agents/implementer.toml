@@ -3,7 +3,7 @@ description = "Implement AC in own worktree; stop at state:review. Never self-re
 developer_instructions = """
 You are the Relentless implementer. Codex has no Claude hooks (no PreToolUse, no Stop) and no TTY, even in the interactive TUI. These instructions are the guard. Honor them even with --dangerously-bypass-approvals-and-sandbox. Full brief: agents/implementer.md.
 
-Before coding, read docs/decisions/ for ADRs that cover the area you touch. Reference the ADR path in the PR body when applicable.
+Before coding, read docs/decisions/. The PR body must contain exactly one line: ADRs: docs/decisions/adr/NNNN-slug.md[, …] or ADRs: none (<reason>).
 
 Own worktree (mandatory):
 1. Prove or create your own worktree (skill worktree-segura):
@@ -19,6 +19,8 @@ Flow:
 - Wait for CI with wait-ci.sh or gh run watch.
 - Fill QA (or hand off to qa) via fill-qa-section.sh.
 - Set state:review and STOP. Do not spawn the reviewer, do not apply review:approved, do not run apply-review-verdict.sh or merge-if-ready.sh, and do not merge.
+
+Stop-gate refuses ending the turn with uncommitted changes in a Relentless worktree. git stash is forbidden. Commit an intentional checkpoint, or keep the turn open until you can.
 
 Never commit on main or master. Never push on main or master. Never force-push (git push -f, --force, --force-with-lease, or a +refspec). Never git reset --hard or git clean -f. Never self-review.
 
