@@ -105,10 +105,16 @@ core/scripts/check-milestone-pending.sh --repo OWNER/NAME --milestone N
 ```bash
 core/scripts/bootstrap.sh --check-scopes
 core/scripts/bootstrap.sh --repo OWNER/NAME --workdir PATH \
-  --merge-default auto --decider Marcelus          # dry-run
+  --merge-default auto --decider Marcelus --harness both          # dry-run
 core/scripts/bootstrap.sh --repo OWNER/NAME --workdir PATH \
-  --merge-default auto --decider Marcelus --apply  # labels + seeds + empty-repo initial commit
+  --merge-default auto --decider Marcelus --harness claude --apply
 ```
+
+`--harness claude|codex|both` (default `both`): seeds `.codex/agents/*.toml` only for `codex`/`both`. **Never** vendor plugin `agents/` or `skills/` into the consumer — install the plugin.
+
+## Plugin install (do not copy agents/skills)
+- **Claude (prefer project scope):** `claude plugin install relentless@relentless --scope project -y` after `marketplace add` — writes `.claude/settings.json` `enabledPlugins` so collaborators are prompted.
+- **Codex 0.165.x:** no project-scope flag on `codex plugin add` (user-level `~/.codex/config.toml` only). Each collaborator runs `codex plugin marketplace add` + `codex plugin add`.
 
 ## Headless / CLI notes
 - Claude: `claude -p` buffers stdout when redirected — use `--output-format stream-json` for dogfoods.

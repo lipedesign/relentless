@@ -55,5 +55,15 @@ export RELENTLESS_ROOT="<installPath>"
 
 # Codex — prefer cache path, not .tmp marketplaces clone
 # ~/.codex/plugins/cache/relentless/relentless/<version>/
-export RELENTLESS_ROOT=~/.codex/plugins/cache/relentless/relentless/1.2.0
+export RELENTLESS_ROOT=~/.codex/plugins/cache/relentless/relentless/1.2.1
 ```
+
+
+## Project-scoped plugin install
+
+| Runtime | Project scope? | How |
+|---------|----------------|-----|
+| Claude Code | **Yes** — `--scope project` (also `user`, `local`; default `user`) | Writes `.claude/settings.json` `enabledPlugins`; collaborators get prompted. Prefer this over copying agents/skills into the repo. |
+| Codex CLI 0.165.x | **No** equivalent flag on `codex plugin add` | Plugins live in user `~/.codex/config.toml`. Each collaborator installs. Do not invent a project install. |
+
+Bootstrap `--harness claude|codex|both` (default `both`) only seeds `.codex/agents/*.toml` stubs when Codex is in use; it never vendors Claude `agents/`/`skills/`.
