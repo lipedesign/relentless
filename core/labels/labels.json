@@ -1,0 +1,14 @@
+{
+  "labels": [
+    { "name": "state:todo", "color": "FBCA04", "description": "Issue ready to start" },
+    { "name": "state:in-progress", "color": "1D76DB", "description": "Actively being worked" },
+    { "name": "state:blocked", "color": "B60205", "description": "Blocked; pair with human:pending when waiting on a human" },
+    { "name": "state:review", "color": "5319E7", "description": "Awaiting review" },
+    { "name": "state:done", "color": "0E8A16", "description": "Completed" },
+    { "name": "merge:auto", "color": "C2E0C6", "description": "Override: allow agent auto-merge for this issue" },
+    { "name": "merge:human", "color": "F9D0C4", "description": "Override: require human merge for this issue" },
+    { "name": "human:pending", "color": "E4E669", "description": "Awaiting human decision; never remove bare — flip to human:decided" },
+    { "name": "human:decided", "color": "BFDADC", "description": "Human decision recorded; clears pending" },
+    { "name": "review:approved", "color": "0E8A16", "description": "Reviewer approved" }
+  ]
+}
