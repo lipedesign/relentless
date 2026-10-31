@@ -2,6 +2,8 @@
 # Shared helpers for Relentless core scripts.
 # shellcheck source=lib/common.sh
 
+die() { echo "error: $*" >&2; exit 1; }
+
 STATE_LABELS=(state:todo state:in-progress state:blocked state:review state:done)
 
 resolve_config() {
