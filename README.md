@@ -54,11 +54,15 @@ Start a **new** Codex session after install.
      --merge-default auto --decider Marcelus --harness claude --apply
    ```
    `--harness claude|codex|both` (default `both`) controls whether `.codex/agents/*.toml` stubs are seeded. Never vendors plugin `agents/`/`skills/`.
-4. Create outcome milestone + issues:
+4. Create outcome milestone → **epic parent** → sub-issues:
    ```bash
-   ./core/scripts/create-milestone.sh --repo OWNER/NAME --title "User can …" \
+   ./core/scripts/create-milestone.sh --repo OWNER/NAME --title "Theme: subtitle" \
      --outcome "…" --exit-criterion "…"
-   ./core/scripts/create-issue.sh --repo OWNER/NAME --title "…" --milestone 1 --label merge:auto
+   ./core/scripts/create-epic.sh --repo OWNER/NAME --title "… understanding" \
+     --milestone "Theme: subtitle" --outcome "…" --exit-criterion "…"
+   ./core/scripts/create-issue.sh --repo OWNER/NAME --title "feat: …" \
+     --milestone "Theme: subtitle" --type enhancement --parent N --label merge:auto
+   ```
    ```
 5. Implement → QA → **stop at `state:review`** → isolated reviewer → `apply-review-verdict` → **`merge-if-ready`**.
 

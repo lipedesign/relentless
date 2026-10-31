@@ -1,0 +1,62 @@
+name: Investigation
+description: Skeptical probe (lohra-ts investigation) — outcome is a decision or follow-up issues, not permanent code
+title: "investigate: <short question>"
+labels: ["investigation", "state:todo"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this when something needs **skeptical validation before permanent implementation**. Close with a conclusion and optional follow-up issues — not with a feature merge.
+  - type: input
+    id: parent
+    attributes:
+      label: Parent / Sub-issues
+      description: "#N of parent epic, or \"none\". Link natively after create if needed."
+      placeholder: "none"
+  - type: textarea
+    id: question
+    attributes:
+      label: Question / hypothesis
+      description: What claim are we testing? Phrase so it can be falsified.
+      placeholder: We believe X because Y — check whether …
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Why this matters now; links to milestone / epic / prior issues. Cite real paths.
+    validations:
+      required: true
+  - type: textarea
+    id: check
+    attributes:
+      label: What to check
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: method
+    attributes:
+      label: Skeptical validation method
+      description: How we would disprove the hypothesis; what evidence counts; stop condition. Prefer cheap probes over permanent code.
+    validations:
+      required: true
+  - type: textarea
+    id: findings
+    attributes:
+      label: Findings
+      description: Filled during the investigation. Cite paths, commands, measurements.
+  - type: textarea
+    id: conclusion
+    attributes:
+      label: Conclusion / recommendation
+      description: Accept, reject, or defer. Do not ship permanent product code from this issue alone.
+  - type: textarea
+    id: followups
+    attributes:
+      label: Follow-up issues to create
+      description: Concrete next issues (enhancement/bug/documentation) or "none"
+      value: |
+        -

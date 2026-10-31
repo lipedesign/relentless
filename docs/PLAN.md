@@ -162,7 +162,6 @@ Leave full upstream process documentation out of this plugin.
 - Richer ruleset applicator  
 - Full orchestrator/reviewer/documenter agent packs  
 - Status snapshot automation (PR15)  
-- Decompose-epic skill as first-class command  
 
 ---
 
@@ -187,3 +186,7 @@ Addressed in tree after Teste-relentless dogfood:
 - Milestone must not close with open `human:pending`
 - Hooks enforce (PreToolUse exit 2) for pending/decide misuse
 - Codex install via `.agents/plugins/marketplace.json` + `codex plugin marketplace add` / `codex plugin add`
+
+## 10. Epic + label taxonomy (2026-10-31)
+
+Shipped: expanded labels (type / epic / investigation / independence / severity / GitHub defaults; **no** complexity), `create-epic` / `add-sub-issue` / `create-issue --parent` / `close-epic`, `decompose-epic` skill, milestone guards (epic parent + sub-issue linkage), lohra-ts issue form (Proof → QA/dogfood), apollo-style milestone + epic understanding, investigation template.

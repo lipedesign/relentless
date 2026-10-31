@@ -234,6 +234,7 @@ if [[ "$SEED_FILES" -eq 1 ]]; then
     echo "seed (needs --workdir): .relentless/config.json"
   fi
   seed_copy "${TEMPLATES_ROOT}/github/ISSUE_TEMPLATE/relentless.yml" ".github/ISSUE_TEMPLATE/relentless.yml"
+  seed_copy "${TEMPLATES_ROOT}/github/ISSUE_TEMPLATE/investigation.yml" ".github/ISSUE_TEMPLATE/investigation.yml"
   seed_copy "${TEMPLATES_ROOT}/github/PULL_REQUEST_TEMPLATE.md" ".github/PULL_REQUEST_TEMPLATE.md"
   seed_copy "${TEMPLATES_ROOT}/consumer/AGENTS.md" "AGENTS.md"
   seed_copy "${TEMPLATES_ROOT}/consumer/CLAUDE.md" "CLAUDE.md"
@@ -254,6 +255,8 @@ if [[ "$SEED_FILES" -eq 1 ]]; then
     echo "seed skip (no workflow scope): .github/workflows/ci.yml"
   fi
   seed_copy "${TEMPLATES_ROOT}/milestone-outcome.md" "docs/relentless/milestone-outcome.example.md"
+  seed_copy "${TEMPLATES_ROOT}/epic-body.md" "docs/relentless/epic-body.example.md"
+  seed_copy "${TEMPLATES_ROOT}/investigation-body.md" "docs/relentless/investigation-body.example.md"
 else
   echo "seed: skipped (--no-seed-files)"
 fi

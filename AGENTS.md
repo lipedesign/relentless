@@ -19,10 +19,26 @@ Prefer shared `core/` over duplicating logic per runtime. See `docs/harness-prof
 - `merge:auto` | `merge:human` — per-issue override of `merge.default`
 - `human:pending` | `human:decided` — **never** bare-remove `human:pending`; always flip to `human:decided` via `/decide`
 - `review:approved` — review passed
+- **Type** (exactly one per issue): `bug` | `enhancement` | `documentation` | `investigation` | `epic` (parents only)
+- `independence:I1|I2|I3` — optional coupling hint for parallel work
+- `severity:critical|high|medium` — review findings only; do not set on create
+- `orphan:ok` — explicit exception to epic sub-issue linkage in a milestone
+- GitHub defaults kept/recreated: `question`, `duplicate`, `wontfix`, `good first issue`, `help wanted`, `invalid`
+
+There are **no** `complexity:*` labels. Work too big for one session/PR → epic with native sub-issues (judgment).
 
 `state:blocked` pairs with `human:pending` when waiting on a person.
 
 Use `core/scripts/set-state.sh` (quiet by default) for every state transition.
+
+## Milestones → epic → sub-issues
+1. `create-milestone.sh` — title `Theme: subtitle`; description has outcome, deliverable, validates-with, depends-on, exit criterion.
+2. Planner **first** `create-epic.sh` (understanding / issue-mãe) in that milestone.
+3. Then sub-issues via `create-issue.sh --parent N` / `add-sub-issue.sh` (REST `sub_issues` + database id).
+4. Nested epics when a child is still too large. Close with `close-epic.sh` only when all children are closed.
+5. Guards: `check-milestone-outcomes.sh` (epic parent required; orphans need `orphan:ok`).
+
+Skill: `decompose-epic`. Investigation probes use the Investigation template — outcome is a decision or follow-up issues, not permanent code.
 
 ## Assignees
 - Worker while `state:in-progress`

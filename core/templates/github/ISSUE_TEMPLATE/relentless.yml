@@ -1,35 +1,112 @@
 name: Relentless issue
-description: Outcome-tied issue with acceptance criteria and QA section
-title: "[outcome] "
+description: Executable issue — User Story through References (lohra-ts shape; Proof → QA/dogfood)
+title: "<type>: <short description>"
 labels: ["state:todo"]
 body:
-  - type: textarea
-    id: outcome
+  - type: markdown
     attributes:
-      label: Outcome
-      description: What product outcome does this issue deliver? Tie to the milestone.
-      placeholder: User can …
+      value: |
+        Apply **exactly one** type label: `bug`, `enhancement`, `documentation`, or `investigation` (use the Investigation form for probes). Parents that group work use `epic`. Work too big for one session/PR → create an epic and link native sub-issues (`create-issue.sh --parent N`).
+  - type: input
+    id: parent
+    attributes:
+      label: Parent / Sub-issues
+      description: "#N of the parent epic, or \"none\". Native link is done after create via add-sub-issue / create-issue --parent (REST sub_issues)."
+      placeholder: "#21"
+  - type: textarea
+    id: story
+    attributes:
+      label: User Story
+      value: |
+        **As** <persona>,
+        **I want** <capability>,
+        **so that** <benefit>.
     validations:
       required: true
   - type: textarea
-    id: acceptance
+    id: context
+    attributes:
+      label: Context
+      description: Technical/product background with real file:line citations. Never invent references.
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Current scenario
+      description: What happens today, precisely. Not the problem — the description.
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Numbered. The gap between current and desired. No solution here.
+    validations:
+      required: true
+  - type: textarea
+    id: consequences
+    attributes:
+      label: Consequences of the problem
+      description: Bullets of concrete impact.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: What the solution is
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result with the solution
+      description: '"After this, X happens and Y stops" — verifiable.'
+    validations:
+      required: true
+  - type: textarea
+    id: ac
     attributes:
       label: Acceptance criteria
-      description: Checklist a reviewer can verify without implementer chat context
       value: |
         - [ ]
+        - [ ] Tests (when applicable)
+        - [ ] Documentation updated (when applicable)
     validations:
       required: true
-  - type: textarea
-    id: notes
-    attributes:
-      label: Notes
   - type: textarea
     id: qa
     attributes:
-      label: QA / dogfood result
-      description: Filled by the qa agent before review
+      label: QA / dogfood
+      description: How we will exercise the path before review (replaces lohra-ts Proof; no prova runner in Relentless). Or "N/A — why" for docs/process-only work.
       value: |
         - Path exercised:
-        - Result: pass | fail | partial
-        - Gaps:
+        - Result: pass | fail | partial | N/A
+        - Gaps / follow-ups:
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: Files
+      description: Globs this PR may touch. Outside them is scope drift (reviewer rejects).
+      value: |
+        - `src/...`, `tests/...`
+    validations:
+      required: true
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of scope
+  - type: textarea
+    id: refs
+    attributes:
+      label: References
+      description: file:line, issues, ADRs, parent epic.
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: "Blocked by: #N (or none). Orchestrator must not dispatch blocked work."
+      value: |
+        Blocked by: none
