@@ -68,9 +68,16 @@ PROMPT_FILE="${OUT_DIR}/reviewer-prompt.md"
 
 if [[ "$DRY" -eq 1 ]]; then
   echo "dry-run: would spawn $HARNESS reviewer with stdin from $PROMPT_FILE"
+  echo "dry-run: would export RELENTLESS_ROLE=reviewer CLAUDE_AGENT=reviewer"
   echo "dry-run: then apply-review-verdict + $([ "$MERGE" -eq 1 ] && echo merge-if-ready || echo 'no --merge')"
   exit 0
 fi
+
+# Isolation hooks (pretool-reviewer-isolation.sh, pretool-gh-workflow.sh) read
+# these names. Export before every spawn so the reviewer process, its Claude
+# fallback, the Codex spawn, and anything the reviewer itself spawns inherit them.
+export RELENTLESS_ROLE=reviewer
+export CLAUDE_AGENT=reviewer
 
 # Pass bundle via stdin/file — NEVER "$(cat bundle)" as argv (fails on large diffs).
 case "$HARNESS" in
@@ -100,7 +107,7 @@ case "$HARNESS" in
     ;;
   codex)
     # Prefer Write/apply_patch inside nested sessions; avoid huge shell heredocs (Codex classifier false positives).
-    RELENTLESS_ROLE=reviewer codex exec \
+    codex exec \
       --sandbox read-only \
       -C "$WORKDIR" \
       < "$PROMPT_FILE" \
