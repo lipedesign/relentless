@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# decide.sh — record a human decision on an issue and flip human:pending → human:decided.
-# Usage:
-#   decide.sh --repo OWNER/NAME --issue N --option K [--config PATH] [--note TEXT]
-
+# decide.sh — record human decision; flip human:pending → human:decided; set state:todo (swap).
 set -euo pipefail
 
 REPO=""
 ISSUE=""
 OPTION=""
-CONFIG=".relentless/config.json"
+CONFIG=""
 NOTE=""
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/common.sh
+source "${SCRIPT_DIR}/lib/common.sh"
 
 usage() {
   cat <<USAGE
@@ -33,11 +33,12 @@ if [[ -z "$REPO" || -z "$ISSUE" || -z "$OPTION" ]]; then
   usage; exit 2
 fi
 
+RESOLVED="$(resolve_config "${CONFIG:-.relentless/config.json}" "$REPO" || true)"
+CONFIG="${RESOLVED:-}"
+
 DECIDER_NAME="human"
-DECIDER_GH=""
-if [[ -f "$CONFIG" ]]; then
+if [[ -n "$CONFIG" && -f "$CONFIG" ]]; then
   DECIDER_NAME="$(jq -r '.decider.name // "human"' "$CONFIG")"
-  DECIDER_GH="$(jq -r '.decider.github // empty' "$CONFIG")"
 fi
 
 BODY=$(cat <<COMMENT
@@ -54,16 +55,15 @@ COMMENT
 
 gh issue comment "$ISSUE" --repo "$REPO" --body "$BODY"
 
-# Flip labels: remove pending, add decided; clear state:blocked if present → state:todo
 gh issue edit "$ISSUE" --repo "$REPO" --remove-label "human:pending" 2>/dev/null || true
 gh issue edit "$ISSUE" --repo "$REPO" --add-label "human:decided" || true
-gh issue edit "$ISSUE" --repo "$REPO" --remove-label "state:blocked" 2>/dev/null || true
-gh issue edit "$ISSUE" --repo "$REPO" --add-label "state:todo" 2>/dev/null || true
+set_issue_state "$REPO" "$ISSUE" "state:todo"
 
-# Reassign to default worker if configured
-WORKER="$(jq -r '.workers.default.github // empty' "$CONFIG" 2>/dev/null || true)"
-if [[ -n "$WORKER" ]]; then
-  gh issue edit "$ISSUE" --repo "$REPO" --add-assignee "$WORKER" 2>/dev/null || true
+if [[ -n "$CONFIG" && -f "$CONFIG" ]]; then
+  WORKER="$(jq -r '.workers.default.github // empty' "$CONFIG")"
+  if [[ -n "$WORKER" ]]; then
+    gh issue edit "$ISSUE" --repo "$REPO" --add-assignee "$WORKER" 2>/dev/null || true
+  fi
 fi
 
 echo "Recorded option $OPTION on $REPO#$ISSUE (decider=$DECIDER_NAME)"

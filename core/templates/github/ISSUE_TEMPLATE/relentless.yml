@@ -1,0 +1,35 @@
+name: Relentless issue
+description: Outcome-tied issue with acceptance criteria and QA section
+title: "[outcome] "
+labels: ["state:todo"]
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: What product outcome does this issue deliver? Tie to the milestone.
+      placeholder: User can …
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Checklist a reviewer can verify without implementer chat context
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+  - type: textarea
+    id: qa
+    attributes:
+      label: QA / dogfood result
+      description: Filled by the qa agent before review
+      value: |
+        - Path exercised:
+        - Result: pass | fail | partial
+        - Gaps:

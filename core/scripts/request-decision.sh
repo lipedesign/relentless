@@ -1,23 +1,21 @@
 #!/usr/bin/env bash
-# request-decision.sh — post decision-request comment and apply human:pending + state:blocked.
-# The comment body MUST follow core/templates/decision-request.md (pass via --body-file).
-#
-# Usage:
-#   request-decision.sh --repo OWNER/NAME --issue N --body-file PATH [--config PATH]
-
+# request-decision.sh — post decision-request comment; human:pending + state:blocked (swap, never stack).
 set -euo pipefail
 
 REPO=""
 ISSUE=""
 BODY_FILE=""
-CONFIG=".relentless/config.json"
+CONFIG=""
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/common.sh
+source "${SCRIPT_DIR}/lib/common.sh"
 
 usage() {
   cat <<USAGE
 Usage: $(basename "$0") --repo OWNER/NAME --issue N --body-file PATH [--config PATH]
 
-Body file must follow core/templates/decision-request.md (question, numbered options
-with pros/cons, recommendation).
+Body file must follow core/templates/decision-request.md.
+Config defaults to <git-root>/.relentless/config.json when omitted.
 USAGE
 }
 
@@ -35,12 +33,8 @@ done
 if [[ -z "$REPO" || -z "$ISSUE" || -z "$BODY_FILE" ]]; then
   usage; exit 2
 fi
-if [[ ! -f "$BODY_FILE" ]]; then
-  echo "error: body file not found: $BODY_FILE" >&2
-  exit 1
-fi
+[[ -f "$BODY_FILE" ]] || { echo "error: body file not found: $BODY_FILE" >&2; exit 1; }
 
-# Soft check that template markers exist
 if ! grep -q 'relentless:decision-request' "$BODY_FILE"; then
   echo "warn: body missing <!-- relentless:decision-request --> marker" >&2
 fi
@@ -48,16 +42,20 @@ if ! grep -qE '^### [0-9]+\.' "$BODY_FILE"; then
   echo "warn: body may be missing numbered options (### N.)" >&2
 fi
 
+RESOLVED="$(resolve_config "${CONFIG:-.relentless/config.json}" "$REPO" || true)"
+CONFIG="${RESOLVED:-}"
+
 gh issue comment "$ISSUE" --repo "$REPO" --body-file "$BODY_FILE"
 
 gh issue edit "$ISSUE" --repo "$REPO" --add-label "human:pending" || true
-gh issue edit "$ISSUE" --repo "$REPO" --add-label "state:blocked" || true
-# Remove in-progress if present
-gh issue edit "$ISSUE" --repo "$REPO" --remove-label "state:in-progress" 2>/dev/null || true
+# Exactly one state:* — blocked
+set_issue_state "$REPO" "$ISSUE" "state:blocked"
 
-DECIDER_GH="$(jq -r '.decider.github // empty' "$CONFIG" 2>/dev/null || true)"
-if [[ -n "$DECIDER_GH" ]]; then
-  gh issue edit "$ISSUE" --repo "$REPO" --add-assignee "$DECIDER_GH" 2>/dev/null || true
+if [[ -n "$CONFIG" && -f "$CONFIG" ]]; then
+  DECIDER_GH="$(jq -r '.decider.github // empty' "$CONFIG")"
+  if [[ -n "$DECIDER_GH" ]]; then
+    gh issue edit "$ISSUE" --repo "$REPO" --add-assignee "$DECIDER_GH" 2>/dev/null || true
+  fi
 fi
 
-echo "Decision requested on $REPO#$ISSUE (human:pending + state:blocked)"
+echo "Decision requested on $REPO#$ISSUE (human:pending + state:blocked; other state:* removed)"
