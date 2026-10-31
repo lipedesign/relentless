@@ -1,6 +1,5 @@
-# Claude Code — project brief
+# Claude Code — Relentless consumer
 
-Follow Relentless doctrine (see `AGENTS.md` in this repo and the Relentless plugin).
+Use Relentless skills/commands. Implementer stops at `state:review`. Reviewer: `claude -p --agent relentless:reviewer` with a `build-review-bundle.sh` file only. After approve: `merge-if-ready.sh`.
 
-- Use Relentless skills: bootstrap, human-gate, issue-lifecycle, milestone-guard, pr-merge-gate, dogfood-qa.
-- Reviewer runs isolated — never feed it implementer chat.
+For headless logs use `claude -p --output-format stream-json`.

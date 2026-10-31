@@ -1,10 +1,7 @@
-# Project agents
+# Agent notes (Relentless)
 
-This project uses the **Relentless** workflow plugin.
+This repo is bootstrapped with Relentless. Follow the plugin doctrine (`AGENTS.md` in the Relentless plugin) and `docs/harness-profiles.md`.
 
-- Doctrine: follow Relentless `AGENTS.md` (labels, human gates, authorship markers, merge policy, product-outcome milestones).
-- Config: `.relentless/config.json`
-- When blocked on a human: post `core/templates/decision-request.md` and apply `human:pending` (never bare-remove it — use `/decide`).
-- Spawn the **reviewer** as an isolated session with only: issue acceptance criteria, PR diff, and QA/dogfood section.
+Quick loop: implement → QA → `state:review` → **isolated** reviewer → `apply-review-verdict` → `merge-if-ready`.
 
-Add project-specific notes below.
+Implementer never self-reviews. Prefer `merge-if-ready.sh` for the final merge step.

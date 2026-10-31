@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "relentless",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Reusable agent workflow for Claude Code and Codex: product-outcome milestones, human decision gates, configurable merge policy, isolated reviewer.",
   "author": {
     "name": "Marcelus Fernandes",
@@ -9,7 +9,13 @@
   },
   "repository": "https://github.com/marcelusfernandes/relentless",
   "license": "MIT",
-  "keywords": ["workflow", "github", "issues", "human-gate", "milestones"],
+  "keywords": [
+    "workflow",
+    "github",
+    "issues",
+    "human-gate",
+    "milestones"
+  ],
   "extensions": {
     "com.openai": {
       "hooks": "./hooks/hooks.json",

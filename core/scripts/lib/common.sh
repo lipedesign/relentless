@@ -1,16 +1,12 @@
 #!/usr/bin/env bash
-# Shared helpers for Relentless core scripts. Source from other scripts:
-#   SCRIPT_DIR=...; # shellcheck source=lib/common.sh
-#   source "${SCRIPT_DIR}/lib/common.sh"
+# Shared helpers for Relentless core scripts.
+# shellcheck source=lib/common.sh
 
 STATE_LABELS=(state:todo state:in-progress state:blocked state:review state:done)
 
-# resolve_config PATH_OR_EMPTY REPO → prints absolute config path or empty
 resolve_config() {
   local cfg="${1:-}"
-  local repo="${2:-}"
   if [[ -n "$cfg" && -f "$cfg" ]]; then
-    # shellcheck disable=SC2001
     (cd "$(dirname "$cfg")" && echo "$(pwd)/$(basename "$cfg")")
     return 0
   fi
@@ -18,18 +14,12 @@ resolve_config() {
     echo "${WORKDIR}/${cfg}"
     return 0
   fi
-  # Try git root of current directory
   local root
   root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
   if [[ -n "$root" && -f "${root}/.relentless/config.json" ]]; then
     echo "${root}/.relentless/config.json"
     return 0
   fi
-  if [[ -n "$cfg" && -f "$cfg" ]]; then
-    echo "$cfg"
-    return 0
-  fi
-  # Last resort: relative default if present
   if [[ -f ".relentless/config.json" ]]; then
     echo "$(pwd)/.relentless/config.json"
     return 0
@@ -38,31 +28,51 @@ resolve_config() {
   return 1
 }
 
-# set_issue_state REPO ISSUE state:NAME
-# Removes every other state:* label, then adds the target (one active state).
+# Plugin root (install cache or checkout). Prefer RELENTLESS_ROOT, else this script tree.
+relentless_root() {
+  if [[ -n "${RELENTLESS_ROOT:-}" && -d "${RELENTLESS_ROOT}" ]]; then
+    echo "$RELENTLESS_ROOT"
+    return 0
+  fi
+  local here
+  here="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  echo "$here"
+}
+
+# set_issue_state REPO ISSUE state:NAME [quiet=0]
+# One GET + one PATCH; preserves non-state labels; never stacks state:*.
 set_issue_state() {
   local repo="$1"
   local issue="$2"
   local target="$3"
-  local label
-  for label in "${STATE_LABELS[@]}"; do
-    if [[ "$label" != "$target" ]]; then
-      gh issue edit "$issue" --repo "$repo" --remove-label "$label" 2>/dev/null || true
-    fi
-  done
-  gh issue edit "$issue" --repo "$repo" --add-label "$target" || true
+  local quiet="${4:-0}"
+  local current new_json
+  current="$(gh api "repos/${repo}/issues/${issue}" --jq '[.labels[].name]' 2>/dev/null || echo '[]')"
+  new_json="$(jq -c --arg t "$target" --argjson states "$(printf '%s\n' "${STATE_LABELS[@]}" | jq -R . | jq -s .)" '
+    ([.[] | select(. as $l | $states | index($l) | not)] + [$t]) | unique
+  ' <<<"$current")"
+  # Build -f labels[]= args
+  local args=(-X PATCH "repos/${repo}/issues/${issue}")
+  local name
+  while IFS= read -r name; do
+    [[ -n "$name" ]] || continue
+    args+=(-f "labels[]=${name}")
+  done < <(jq -r '.[]' <<<"$new_json")
+  if [[ "$quiet" -eq 1 ]]; then
+    gh api "${args[@]}" >/dev/null
+  else
+    gh api "${args[@]}" --jq '"\(.html_url) → labels updated"' >/dev/null
+    echo "${repo}#${issue} → ${target}"
+  fi
 }
 
-# check_gh_workflow_scope → 0 if workflow present, 1 otherwise (prints guidance)
 check_gh_workflow_scope() {
   local status scopes
   status="$(gh auth status 2>&1 || true)"
-  # Prefer explicit token scopes line
   if echo "$status" | grep -qiE "Token scopes:.*['\"]workflow['\"]|scopes:.*workflow"; then
     echo "gh scopes: workflow present"
     return 0
   fi
-  # Fallback: try to parse hosts.yml / gh api
   scopes="$(gh api -i -X GET /user 2>&1 | grep -i '^x-oauth-scopes:' || true)"
   if echo "$scopes" | grep -qw workflow; then
     echo "gh scopes: workflow present"
@@ -72,4 +82,22 @@ check_gh_workflow_scope() {
   echo "  Relentless cannot push .github/workflows/*.yml without it." >&2
   echo "  Fix: gh auth refresh -s workflow" >&2
   return 1
+}
+
+# resolve_merge_mode REPO ISSUE CONFIG → prints auto|human
+resolve_merge_mode() {
+  local repo="$1" issue="$2" config="${3:-}"
+  local labels
+  labels="$(gh api "repos/${repo}/issues/${issue}" --jq '[.labels[].name] | join("\n")' 2>/dev/null || true)"
+  if echo "$labels" | grep -Fxq "merge:human"; then
+    echo "human"; return 0
+  fi
+  if echo "$labels" | grep -Fxq "merge:auto"; then
+    echo "auto"; return 0
+  fi
+  if [[ -n "$config" && -f "$config" ]]; then
+    jq -r '.merge.default // "human"' "$config"
+    return 0
+  fi
+  echo "human"
 }

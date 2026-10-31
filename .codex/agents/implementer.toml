@@ -1,2 +1,5 @@
 name = "implementer"
-description = "Implement issue acceptance criteria; respect merge policy and human gates."
+description = "Implement AC; stop at state:review. Never self-review or merge. Needs full sandbox bypass for git/gh."
+# Launch: codex exec --dangerously-bypass-approvals-and-sandbox --dangerously-bypass-hook-trust
+# export RELENTLESS_ROLE=implementer
+# Full brief: agents/implementer.md
