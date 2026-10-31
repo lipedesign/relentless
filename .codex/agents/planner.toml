@@ -1,0 +1,3 @@
+name = "planner"
+description = "Break product outcomes into milestone-aligned issues. Does not implement code."
+# Instructions live in agents/planner.md and AGENTS.md (shared with Claude).

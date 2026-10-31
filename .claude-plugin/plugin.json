@@ -1,0 +1,9 @@
+{
+  "name": "relentless",
+  "version": "1.0.0",
+  "description": "Reusable agent workflow: GitHub issues/milestones as product outcomes, human decision gates, configurable merge policy, dual Claude Code + Codex support.",
+  "author": {
+    "name": "Marcelus Fernandes"
+  },
+  "keywords": ["workflow", "github", "issues", "human-gate", "milestones"]
+}

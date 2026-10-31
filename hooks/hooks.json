@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '[relentless] reminder: workflow comments need 🤖/☺️ + HTML authorship markers; human:pending requires decision-request template'"
+          }
+        ]
+      }
+    ]
+  }
+}

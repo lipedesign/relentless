@@ -1,0 +1,4 @@
+.relentless/config.json
+notes/
+*.log
+.DS_Store

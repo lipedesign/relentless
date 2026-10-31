@@ -1,0 +1,2 @@
+name = "qa"
+description = "Dogfood the workflow; verify acceptance criteria; file gaps."

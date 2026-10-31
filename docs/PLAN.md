@@ -1,0 +1,175 @@
+# PLAN — relentless
+
+Reusable agent-workflow plugin for **Claude Code** and **Codex**. New personal projects start with labels, templates, doctrine, skills, agents, hooks, and a bootstrap that installs them.
+
+| | |
+|--|--|
+| Plugin name | `relentless` |
+| Repo | https://github.com/marcelusfernandes/relentless |
+| Artifact language | English |
+| Research / decisions | 2026-10-31 (America/Sao_Paulo) |
+
+---
+
+## 0. Closed decisions
+
+| # | Topic | Decision |
+|---|--------|----------|
+| 1 | Merge | Configurable. Setup chooses repo default (`auto` / `human`). Per-issue `merge:auto` / `merge:human` override. |
+| 2 | Branch ruleset | Opt-in at setup; fail soft on API/permission errors — never abort bootstrap. |
+| 3 | Language | English only for plugin artifacts. |
+| 4 | PR14 + PR15 | In v1 as light templates. **Key principle:** milestones = **product outcomes**; engineering work = issues under an outcome milestone. |
+| 5 | Product Upstream | Out of scope. See §5 (`bus-upstream` assessment). |
+| 6 | Proof vs Dogfood | Remove Proof (PR8). Keep Dogfooding as a **QA section** owned by the **qa** agent. |
+| A | Human labels | `human:pending` and `human:decided`. Never bare-remove pending — flip to decided. `state:blocked` pairs with pending on escalation. |
+| B | Authorship markers | Agent: `🤖` + `<!-- relentless:author=agent -->`. Relayed human: `☺️` + `<!-- relentless:author=human decider="<name>" -->`. Decider name from setup config, not GitHub account. |
+| C | Assignees | Assignee = worker in progress; reassign to decider on `human:pending`. Reviewer assignment = **v1.1**. |
+| D | Decision request | When applying `human:pending`, comment **must** follow `core/templates/decision-request.md`: question/context, numbered options with pros/cons, agent recommendation. `/decide` records the chosen option with ☺️ and flips to `human:decided`. |
+
+---
+
+## 1. Practice inventory (include / exclude)
+
+### Planning
+| ID | Practice | Decision | Notes |
+|----|----------|----------|-------|
+| PR1 | Issue-first | include | English template; QA/dogfood section instead of Proof |
+| PR2 | Milestone as phase + exit criteria | include + strengthen | Must state product outcome |
+| PR3 | Epic → sub-issues | include | Tie to outcome milestone |
+
+### Governance
+| ID | Practice | Decision | Notes |
+|----|----------|----------|-------|
+| PR4 | Decision records | include | ADR = human gate |
+| PR5 | Explicit human gates | include | Closed list; blocked + pending |
+| PR7 | Isolated review + merge | include | Mode from setup |
+| PR14 | Review findings → follow-up | include (light) | Outcome-framed when user-facing |
+| PR15 | Dated status snapshot | include (light) | Template under docs/status |
+
+### Agents / Git / quality
+| ID | Practice | Decision |
+|----|----------|----------|
+| PR6 | Named roles | include (orchestrator session + implementer / reviewer / qa / documenter) |
+| PR9 | Worktree per writer | include |
+| PR10 | Conventional commits + Closes #N | include |
+| PR11 | `state:*` taxonomy | include + human/merge/review labels |
+| PR8 | Proof machine | **exclude** |
+| PR16 | Dogfooding | **include** (replaces Proof) |
+| PR12 | External content = data | include (doctrine) |
+| PR13 | Explicit named failure | include |
+
+### Lateral
+- Hooks (generic stop-gate / protect-main): include, no proof checks  
+- Ruleset script: opt-in, fail soft  
+- Domain skills, Notion “add product”, Product Upstream/BUS: **exclude**
+
+---
+
+## 2. New design details
+
+### 2.1 Product-outcome milestones
+A milestone describes a user-observable product result and exit criteria verified **by using the product**. Engineering-only titles are forbidden as milestones; they are issues under an outcome milestone.
+
+Artifacts: `core/templates/milestone-outcome.md`, skill `milestone-guard`, `core/scripts/check-milestone-outcomes.sh`.
+
+### 2.2 Merge modes
+- `merge.default`: `auto` | `human` in `.relentless/config.json`
+- Overrides: `merge:auto` / `merge:human` on the issue when allowed
+- Skill: `pr-merge-gate`
+
+### 2.3 Human gate + decision-request (D)
+Flow:
+
+1. Agent drafts comment from **`core/templates/decision-request.md`** (question, context, numbered options with pros/cons, recommendation).
+2. `core/scripts/request-decision.sh` (or `/request-decision`) posts it, adds `human:pending` + `state:blocked`, assigns `decider.github`.
+3. Human replies with an option number.
+4. `/decide` / `core/scripts/decide.sh` posts ☺️ relayed-decision marker, flips `human:pending` → `human:decided`, clears blocked, sets `state:todo`, reassigns worker.
+
+Doctrine (`AGENTS.md`) and skill `human-gate` both require the template.
+
+### 2.4 Authorship + assignees
+See decisions B and C. Config schema: `core/schemas/config.schema.json`.
+
+### 2.5 Dogfood QA
+Skill `dogfood-qa`; agent `qa`. Structured QA section on issue/PR. No provas runner.
+
+---
+
+## 3. Repository layout (v1)
+
+```
+.claude-plugin/plugin.json
+.codex-plugin/plugin.json
+.codex/agents/*.toml
+marketplace/marketplace.json
+agents/{planner,implementer,qa}.md
+skills/{bootstrap,human-gate,issue-lifecycle,milestone-guard,pr-merge-gate,dogfood-qa}/SKILL.md
+commands/{decide,bootstrap,request-decision}.md
+hooks/hooks.json
+core/labels/labels.json
+core/templates/{decision-request,authorship-markers,issue-body,milestone-outcome}.md
+core/scripts/{bootstrap,decide,request-decision,check-milestone-outcomes}.sh
+core/schemas/{config.schema.json,config.example.json}
+AGENTS.md
+docs/PLAN.md
+README.md
+LICENSE
+```
+
+Consumer projects keep `.relentless/config.json` (not committed to the plugin as the live config).
+
+---
+
+## 4. Bootstrap
+
+`core/scripts/bootstrap.sh --repo OWNER/NAME [--config PATH] [--apply]`
+
+- Default **dry-run**
+- Creates/updates labels from `core/labels/labels.json`
+- Validates config lightly
+- Rulesets: only if `rulesets.apply`, fail soft
+
+---
+
+## 5. bus-upstream assessment (read-only)
+
+Do **not** port BUS/Product Upstream into v1. Useful inspirations already absorbed:
+
+- Outcome-oriented planning language  
+- Explicit `/decide`-style human relay  
+- Dry-run / `--apply` bootstrap habit  
+- Optional HTML comment markers for machines  
+
+Leave full upstream process documentation out of this plugin.
+
+---
+
+## 6. Validation (v1 gate)
+
+| Check | How |
+|-------|-----|
+| Shell syntax | `bash -n` on `core/scripts/*.sh` |
+| Claude plugin shape | `claude plugin validate` when CLI available |
+| Bootstrap dry-run | Against `marcelusfernandes/relentless` (no `--apply` unless asked) |
+| Template presence | `decision-request.md` referenced from doctrine + human-gate + `/decide` |
+| No notes/ in git | Research notes stay out of this repo |
+
+---
+
+## 7. v1.1 backlog (documented only)
+
+- Reviewer auto-assignment  
+- Richer ruleset applicator  
+- Full orchestrator/reviewer/documenter agent packs  
+- Status snapshot automation (PR15)  
+- Decompose-epic skill as first-class command  
+
+---
+
+## 8. Non-goals
+
+- Writing into other product repos during scaffold  
+- Applying labels with `--apply` without explicit approval  
+- Merging the scaffold PR without human review  
+- Proof/provas surfaces  
+- Shipping Product Upstream inside Relentless  
