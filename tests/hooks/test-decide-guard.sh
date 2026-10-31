@@ -26,6 +26,25 @@ if [[ "$1" == "api" ]]; then
       printf '%s\n' "${GH_FILES:-README.md}"
       ;;
     *contents/docs/decisions/adr/*)
+      req_path=""
+      for arg in "$@"; do
+        if [[ "$arg" == *"/contents/"* ]]; then
+          req_path="${arg#*/contents/}"
+          req_path="${req_path%%\?*}"
+        fi
+      done
+      if [[ -n "${GH_ADR_MISSING:-}" ]]; then
+        while IFS= read -r miss || [[ -n "$miss" ]]; do
+          if [[ -n "$miss" && "$req_path" == "$miss" ]]; then
+            echo "404 Not Found" >&2
+            exit 1
+          fi
+        done <<<"${GH_ADR_MISSING}"
+      fi
+      if [[ "$*" == *"--jq .path"* ]]; then
+        printf '%s\n' "$req_path"
+        exit 0
+      fi
       tr -d '\n' <"${GH_ADR_B64:?}"
       echo
       ;;
@@ -42,6 +61,10 @@ if [[ "$1" == "api" ]]; then
   exit 0
 fi
 if [[ "$1" == "pr" ]]; then
+  if [[ "$*" == *"-q .body"* ]]; then
+    printf '%s\n' "${GH_PR_BODY-}"
+    exit 0
+  fi
   echo '{"headRefOid":"abc123","headRefName":"feat/1-x","baseRefName":"main","state":"open"}'
   exit 0
 fi
@@ -319,7 +342,8 @@ else
   ok
 fi
 
-# merge-if-ready refuses an accepted ADR in the diff with no decision-request comment.
+# merge-if-ready refuses an accepted ADR in the diff with no decision-request comment,
+# and refuses a PR body whose ADRs: line is missing, duplicated, or invalid.
 ADR_OK="$TMP/accepted.md"
 cat >"$ADR_OK" <<'EOF'
 # ADR 0004 — Example
@@ -332,51 +356,109 @@ Option 1 accepted.
 EOF
 base64 -w0 "$ADR_OK" >"$TMP/adr.b64"
 export GH_ADR_B64="$TMP/adr.b64"
+
+run_merge() {
+  : >"$GH_LOG"
+  out="$(
+    env -u RELENTLESS_ROLE \
+    "$ROOT/core/scripts/merge-if-ready.sh" --repo o/r --pr 3 --issue 9 \
+      --config "$TMP/work/.relentless/config.json" --dry-run 2>&1
+  )"
+  rc=$?
+}
+
+assert_labels_untouched() {
+  local name="$1"
+  if grep -qE 'pr merge|-X PATCH|add-label|remove-label' "$GH_LOG"; then
+    bad "$name mutated labels or merged: $(cat "$GH_LOG")"
+    return 1
+  fi
+  return 0
+}
+
+expect_adr_refusal() {
+  local name="$1" needle="$2"
+  run_merge
+  if [[ "$rc" -eq 0 ]]; then
+    bad "$name exited 0: $out"
+    return
+  fi
+  if printf '%s' "$out" | grep -q 'dry-run'; then
+    bad "$name reached dry-run: $out"
+    return
+  fi
+  if ! printf '%s' "$out" | grep -q "$needle"; then
+    bad "$name missing [$needle]: $out"
+    return
+  fi
+  assert_labels_untouched "$name" || return
+  ok
+}
+
+expect_adr_ok() {
+  local name="$1"
+  run_merge
+  if [[ "$rc" -ne 0 ]]; then
+    bad "$name refused ($rc): $out"
+    return
+  fi
+  if ! printf '%s' "$out" | grep -q 'dry-run'; then
+    bad "$name did not reach dry-run: $out"
+    return
+  fi
+  assert_labels_untouched "$name" || return
+  ok
+}
+
 export GH_FILES="docs/decisions/adr/0004-example.md"
 export GH_COMMENTS="no request here"
-: >"$GH_LOG"
-out="$(
-  env -u RELENTLESS_ROLE \
-  "$ROOT/core/scripts/merge-if-ready.sh" --repo o/r --pr 3 --issue 9 \
-    --config "$TMP/work/.relentless/config.json" --dry-run 2>&1
-)"
-rc=$?
-if [[ "$rc" -eq 0 ]]; then
-  bad "merge-if-ready allowed an accepted ADR without a decision-request: $out"
-elif ! printf '%s' "$out" | grep -q 'no decision-request'; then
-  bad "merge-if-ready refusal missing decision-request reason: $out"
-else
-  ok
-fi
+export GH_PR_BODY="ADRs: docs/decisions/adr/0004-example.md"
+unset GH_ADR_MISSING
+expect_adr_refusal "accepted ADR without decision-request" "no decision-request"
 
 export GH_COMMENTS="<!-- relentless:decision-request -->"
-: >"$GH_LOG"
-out="$(
-  "$ROOT/core/scripts/merge-if-ready.sh" --repo o/r --pr 3 --issue 9 \
-    --config "$TMP/work/.relentless/config.json" --dry-run 2>&1
-)"
-rc=$?
-if [[ "$rc" -ne 0 ]]; then
-  bad "merge-if-ready blocked a requested ADR ($rc): $out"
-elif ! printf '%s' "$out" | grep -q 'dry-run'; then
-  bad "merge-if-ready did not reach dry-run: $out"
-else
-  ok
-fi
+expect_adr_ok "accepted ADR with decision-request"
 
 export GH_FILES="README.md"
 export GH_COMMENTS=""
-: >"$GH_LOG"
-out="$(
-  "$ROOT/core/scripts/merge-if-ready.sh" --repo o/r --pr 3 --issue 9 \
-    --config "$TMP/work/.relentless/config.json" --dry-run 2>&1
-)"
-rc=$?
-if [[ "$rc" -ne 0 ]]; then
-  bad "merge-if-ready blocked a PR with no ADR ($rc): $out"
+export GH_PR_BODY="ADRs: none (readme only)"
+expect_adr_ok "PR with no ADR file"
+
+export GH_PR_BODY=$'## Summary\nCloses #9\n<!-- or: ADRs: docs/decisions/adr/0001-worktree-per-writer.md -->'
+expect_adr_refusal "missing ADRs line" "missing the required ADRs: line"
+
+export GH_PR_BODY=$'ADRs: none (first)\nADRs: docs/decisions/adr/0001-worktree-per-writer.md'
+expect_adr_refusal "duplicate ADRs line" "more than once"
+
+export GH_PR_BODY="ADRs: none"
+expect_adr_refusal "ADRs none without reason" "without a reason in parentheses"
+
+export GH_PR_BODY="ADRs: none ()"
+expect_adr_refusal "ADRs none with empty parentheses" "without a reason in parentheses"
+
+export GH_PR_BODY=$'## ADRs\nADRs: none (no adr, docs only)\n<!-- or: ADRs: docs/decisions/adr/NNNN-slug.md[, …] -->'
+expect_adr_ok "ADRs none with reason"
+
+export GH_PR_BODY="ADRs: docs/decisions/adr/0001-worktree-per-writer.md"
+expect_adr_ok "single ADR path"
+if ! grep -q 'contents/docs/decisions/adr/0001-worktree-per-writer.md?ref=abc123' "$GH_LOG"; then
+  bad "single ADR path was not checked at the PR head: $(cat "$GH_LOG")"
 else
   ok
 fi
+
+export GH_PR_BODY="ADRs: docs/decisions/adr/0001-worktree-per-writer.md, docs/decisions/adr/0002-decision-records-first-class.md"
+expect_adr_ok "multiple ADR paths"
+if ! grep -q 'contents/docs/decisions/adr/0002-decision-records-first-class.md?ref=abc123' "$GH_LOG"; then
+  bad "second ADR path was not checked at the PR head: $(cat "$GH_LOG")"
+else
+  ok
+fi
+
+export GH_ADR_MISSING="docs/decisions/adr/0099-missing.md"
+export GH_PR_BODY="ADRs: docs/decisions/adr/0001-worktree-per-writer.md, docs/decisions/adr/0099-missing.md"
+expect_adr_refusal "nonexistent ADR path" "does not exist at PR head"
+unset GH_ADR_MISSING
 
 echo "pass=$PASS fail=$FAIL"
 [[ $FAIL -eq 0 ]]
