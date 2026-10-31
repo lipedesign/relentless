@@ -1,6 +1,6 @@
 # Deferred to v1.1+
 
-Cheap Round-2 items shipped in 1.2.0. The following remain deferred:
+Cheap Round-2 items shipped in 1.2.x. The following remain deferred:
 
 | ID | Item | Why deferred |
 |----|------|--------------|
@@ -11,7 +11,8 @@ Cheap Round-2 items shipped in 1.2.0. The following remain deferred:
 | P2-claude-y | `-y` on `marketplace add` | Upstream Claude Code CLI |
 | P3-dup-bootstrap | Duplicate bootstrap in plugin details inventory | Cosmetic |
 | P3-always-on-tok | Always-on ~634 tok injection | Claude plugin surface; tune later |
-| P3-consumer-claude-agents | Seed Claude `agents/` into consumer | Plugin agents load globally — OK |
+| P3-consumer-claude-agents | Seed Claude `agents/` into consumer | **Won't do** — install plugin at `--scope project` instead |
+| Codex-project-scope | Upstream `codex plugin add --scope` | Not present in 0.165.x; document user-level only until Codex adds it |
 | P2-headless-dogfood | Ship puppeteer/playwright helper in plugin | Recipe noted in dogfood-qa; full scaffold is heavier |
 | P2-react-input | Document native value setter for controlled inputs | One-liner in dogfood-qa skill (done lightly); full harness later |
 | P3-pkill | PID-file guidance for preview servers | Note in dogfood-qa; not a script yet |

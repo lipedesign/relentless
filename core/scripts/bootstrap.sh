@@ -5,6 +5,7 @@ set -euo pipefail
 
 REPO="" APPLY=0 CONFIG="" WORKDIR="" SEED_FILES=1
 MERGE_DEFAULT="" DECIDER_NAME="" DECIDER_GITHUB=""
+HARNESS="both"
 INIT_EMPTY=1
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/common.sh
@@ -27,6 +28,11 @@ Usage: $(basename "$0") --repo OWNER/NAME [options]
   --decider NAME           Set decider.name (non-interactive)
   --decider-github LOGIN   Set decider.github (default: gh api user login)
   --no-init-empty          Do not create initial commit on empty repos
+  --harness claude|codex|both
+                           Which agent harness this repo uses (default: both).
+                           Seeds .codex/agents/*.toml only when harness is
+                           codex or both. Never vendors plugin agents/skills
+                           into the consumer — install the plugin instead.
 
 Empty repos: with --workdir and --apply, creates a minimal README commit on main
 unless --no-init-empty. Dry-run prints the plan.
@@ -46,6 +52,7 @@ while [[ $# -gt 0 ]]; do
     --decider) DECIDER_NAME="${2:-}"; shift 2 ;;
     --decider-github) DECIDER_GITHUB="${2:-}"; shift 2 ;;
     --no-init-empty) INIT_EMPTY=0; shift ;;
+    --harness) HARNESS="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown arg: $1" >&2; usage; exit 2 ;;
   esac
@@ -63,9 +70,13 @@ for cmd in jq gh; do command -v "$cmd" >/dev/null || { echo "error: $cmd require
 if [[ -n "$MERGE_DEFAULT" && "$MERGE_DEFAULT" != "auto" && "$MERGE_DEFAULT" != "human" ]]; then
   echo "error: --merge-default must be auto|human" >&2; exit 2
 fi
+case "$HARNESS" in
+  claude|codex|both) ;;
+  *) echo "error: --harness must be claude|codex|both" >&2; exit 2 ;;
+esac
 
 MODE="DRY-RUN"; [[ "$APPLY" -eq 1 ]] && MODE="APPLY"
-echo "== Relentless bootstrap ($MODE) on $REPO =="
+echo "== Relentless bootstrap ($MODE) on $REPO (harness=$HARNESS) =="
 
 SCOPE_OK=0
 if check_gh_workflow_scope; then SCOPE_OK=1
@@ -226,10 +237,17 @@ if [[ "$SEED_FILES" -eq 1 ]]; then
   seed_copy "${TEMPLATES_ROOT}/github/PULL_REQUEST_TEMPLATE.md" ".github/PULL_REQUEST_TEMPLATE.md"
   seed_copy "${TEMPLATES_ROOT}/consumer/AGENTS.md" "AGENTS.md"
   seed_copy "${TEMPLATES_ROOT}/consumer/CLAUDE.md" "CLAUDE.md"
-  for agent in planner implementer qa reviewer; do
-    src="${SCRIPT_DIR}/../../.codex/agents/${agent}.toml"
-    [[ -f "$src" ]] && seed_copy "$src" ".codex/agents/${agent}.toml"
-  done
+  # Do NOT vendor Claude agents/ or skills/ into the consumer — collaborators
+  # install the plugin (prefer --scope project). Codex agent tomls are optional
+  # stubs only when this repo uses Codex.
+  if [[ "$HARNESS" == "codex" || "$HARNESS" == "both" ]]; then
+    for agent in planner implementer qa reviewer; do
+      src="${SCRIPT_DIR}/../../.codex/agents/${agent}.toml"
+      [[ -f "$src" ]] && seed_copy "$src" ".codex/agents/${agent}.toml"
+    done
+  else
+    echo "seed skip (--harness claude): .codex/agents/*.toml"
+  fi
   if [[ "$SCOPE_OK" -eq 1 ]]; then
     seed_copy "${TEMPLATES_ROOT}/github/workflows/ci.yml" ".github/workflows/ci.yml"
   else
@@ -249,4 +267,10 @@ if [[ -n "$CONFIG" && -f "$CONFIG" ]]; then
 fi
 
 echo "== done ($MODE) =="
-echo "tip: plugin scripts live under the install cache; export RELENTLESS_ROOT=\$(…/installPath) or use paths from claude plugin list --json / codex plugin list"
+echo "tip: do NOT copy plugin agents/skills into this repo."
+echo "tip: Claude — install at PROJECT scope so .claude/settings.json records it for collaborators:"
+echo "     claude plugin marketplace add marcelusfernandes/relentless"
+echo "     claude plugin install relentless@relentless --scope project -y"
+echo "tip: Codex (0.165.x) has no project-scope plugin install — use user-level:"
+echo "     codex plugin marketplace add marcelusfernandes/relentless && codex plugin add relentless@relentless"
+echo "tip: scripts path → export RELENTLESS_ROOT=\$(claude plugin list --json | …) or ~/.codex/plugins/cache/relentless/relentless/<ver>/"
