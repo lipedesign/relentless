@@ -15,7 +15,8 @@
         "authentication": "ON_INSTALL"
       },
       "category": "Productivity",
-      "description": "Agent workflow: GitHub issues/milestones as outcomes, human gates, merge policy (Claude + Codex)."
+      "description": "Agent workflow: GitHub issues/milestones as outcomes, human gates, merge policy (Claude + Codex).",
+      "version": "1.2.0"
     }
   ]
 }

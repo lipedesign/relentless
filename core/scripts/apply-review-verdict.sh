@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# apply-review-verdict.sh — after reviewer verdict, set labels.
-# Usage: apply-review-verdict.sh --repo OWNER/NAME --issue N --pr N --verdict approved|changes_requested
+# apply-review-verdict.sh — after ISOLATED reviewer verdict, set labels.
+# changes_requested → state:in-progress (implementer resumes).
+# approved → review:approved + state:review (orchestrator then runs merge-if-ready).
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/common.sh
@@ -20,8 +21,8 @@ done
 
 case "$VERDICT" in
   approved)
-    gh issue edit "$ISSUE" --repo "$REPO" --add-label "review:approved" || true
-    set_issue_state "$REPO" "$ISSUE" "state:review"
+    gh api -X POST "repos/${REPO}/issues/${ISSUE}/labels" -f "labels[]=review:approved" >/dev/null || true
+    set_issue_state "$REPO" "$ISSUE" "state:review" 1
     if [[ -n "$PR" ]]; then
       gh pr comment "$PR" --repo "$REPO" --body "🤖 review:approved
 
@@ -29,11 +30,19 @@ case "$VERDICT" in
 <!-- relentless:review-verdict verdict=\"approved\" -->
 " || true
     fi
+    echo "ok approved → review:approved + state:review (next: merge-if-ready.sh)"
     ;;
   changes_requested)
-    gh issue edit "$ISSUE" --repo "$REPO" --remove-label "review:approved" 2>/dev/null || true
-    set_issue_state "$REPO" "$ISSUE" "state:review"
+    gh api -X DELETE "repos/${REPO}/issues/${ISSUE}/labels/review%3Aapproved" 2>/dev/null || true
+    set_issue_state "$REPO" "$ISSUE" "state:in-progress" 1
+    if [[ -n "$PR" ]]; then
+      gh pr comment "$PR" --repo "$REPO" --body "🤖 changes_requested — back to state:in-progress
+
+<!-- relentless:author=agent -->
+<!-- relentless:review-verdict verdict=\"changes_requested\" -->
+" || true
+    fi
+    echo "ok changes_requested → state:in-progress"
     ;;
   *) echo "verdict must be approved|changes_requested" >&2; exit 2 ;;
 esac
-echo "Applied verdict=$VERDICT on $REPO#$ISSUE"

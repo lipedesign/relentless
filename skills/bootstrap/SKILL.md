@@ -1,19 +1,21 @@
 ---
 name: bootstrap
-description: Install Relentless labels and seed consumer artifacts. Always dry-run first unless the user explicitly asks to apply. Checks gh workflow scope.
+description: Install Relentless labels and seed consumer artifacts. Dry-run first unless user asks to apply. Empty repos get an initial commit. Supports --merge-default / --decider.
 ---
 
 # Bootstrap
 
 ## Steps
-1. `core/scripts/bootstrap.sh --check-scopes` — if `workflow` missing, tell the user to run `gh auth refresh -s workflow`.
-2. Confirm target repo has a default branch (initial commit); if empty, say so before milestones.
-3. Dry-run with `--workdir` pointing at the consumer checkout:
+1. `core/scripts/bootstrap.sh --check-scopes`
+2. Empty repos: with `--workdir --apply`, bootstrap creates an initial README commit on `main` (unless `--no-init-empty`).
+3. Dry-run then apply — non-interactive flags supported:
    ```bash
-   core/scripts/bootstrap.sh --repo OWNER/NAME --workdir PATH --config PATH/.relentless/config.json
+   core/scripts/bootstrap.sh --repo OWNER/NAME --workdir PATH \
+     --merge-default auto --decider Marcelus --decider-github marcelusfernandes
+   core/scripts/bootstrap.sh --repo OWNER/NAME --workdir PATH \
+     --merge-default auto --decider Marcelus --apply
    ```
-4. Show the full plan (labels + seed files + CI). Only with explicit approval, re-run with `--apply`.
-5. Rulesets remain opt-in fail-soft (`rulesets.apply`).
+4. Rulesets remain opt-in fail-soft.
 
-## Seeds (unless `--no-seed-files`)
-`.relentless/config.json`, `.github/ISSUE_TEMPLATE/relentless.yml`, `.github/PULL_REQUEST_TEMPLATE.md` (QA section), `.github/workflows/ci.yml`, `AGENTS.md`, `CLAUDE.md`, `.codex/agents/*.toml`.
+## Seeds
+`.relentless/config.json`, issue + PR templates, CI workflow, `AGENTS.md` / `CLAUDE.md`, Codex agent tomls, milestone example.

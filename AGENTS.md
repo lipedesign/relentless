@@ -12,7 +12,7 @@ Ship personal projects with a repeatable agent workflow: GitHub milestones as **
 | Codex | `plugin.json` / `.codex-plugin/`, `.codex/agents/*.toml`, `.agents/plugins/marketplace.json`, this `AGENTS.md` |
 | Shared core | `core/` (templates, labels, scripts, schemas) |
 
-Prefer shared `core/` over duplicating logic per runtime.
+Prefer shared `core/` over duplicating logic per runtime. See `docs/harness-profiles.md`.
 
 ## Labels
 - `state:todo` | `in-progress` | `blocked` | `review` | `done` — **exactly one** active `state:*` (helpers swap; never stack)
@@ -22,7 +22,7 @@ Prefer shared `core/` over duplicating logic per runtime.
 
 `state:blocked` pairs with `human:pending` when waiting on a person.
 
-Use `core/scripts/set-state.sh` (or `set_issue_state` in `lib/common.sh`) for every state transition.
+Use `core/scripts/set-state.sh` (quiet by default) for every state transition.
 
 ## Assignees
 - Worker while `state:in-progress`
@@ -31,83 +31,90 @@ Use `core/scripts/set-state.sh` (or `set_issue_state` in `lib/common.sh`) for ev
 
 ## Authorship markers
 Every workflow comment:
-- Agent: leading `🤖` + `<!-- relentless:author=agent -->`
+- Agent: leading `🤖` + `<!-- relentless:author=agent -->` (prefer `comment-agent.sh`)
 - Human / relayed decision: leading `☺️` + `<!-- relentless:author=human decider="<decider.name>" -->`
 
-`decider.name` comes from project config, not from which GitHub account posted.
-
 ## Human decisions
-When moving an issue to `human:pending`, the agent **must** comment using **`core/templates/decision-request.md`**:
+When moving an issue to `human:pending`, the agent **must** comment using **`core/templates/decision-request.md`**. Skills: `human-gate`. Commands: `/request-decision`, `/decide`.
 
-1. Question + context  
-2. Numbered options, each with short pros/cons  
-3. Agent recommendation with reasoning  
+## Orchestrator loop (implement → review → merge)
 
-The human replies with an option number. `/decide` (or `core/scripts/decide.sh`) records ☺️ + flips to `human:decided`.
-
-Skills: `human-gate`. Commands: `/request-decision`, `/decide`.
-
-## Orchestrator — spawn isolated REVIEWER
-After QA has filled **QA / dogfood result**, the orchestrator **must** start the **reviewer** as a **separate subagent / fresh session** (never continue the implementer thread).
-
-**Pass ONLY:**
-1. Issue text (acceptance criteria)
-2. PR diff
-3. QA / dogfood section
-
-**Do not** pass implementer reasoning, chat logs, or planning notes.
-
-- Claude Code: new agent/session with `agents/reviewer.md`
-- Codex: separate process, for example:
-
-```bash
-# Prepare a bundle file with ONLY the three inputs, then:
-codex exec --sandbox read-only "$(cat review-bundle.md)"
-
-# Or use the built-in review entrypoint with custom instructions:
-codex review --base main "$(cat review-instructions.md)"
+```
+in-progress → (QA) → state:review → [STOP implementer]
+  → isolated reviewer (bundle only)
+  → apply-review-verdict
+       approved          → merge-if-ready → state:done
+       changes_requested → state:in-progress (resume implementer)
 ```
 
-Reviewer is **read-only** (no edits/commits). It outputs the structured verdict in `agents/reviewer.md`. Orchestrator (or `core/scripts/apply-review-verdict.sh`) applies `review:approved` or leaves changes requested.
+### Implementer stop rule (mandatory)
+The implementer **stops at `state:review`**. It must **not**:
+- claim to have run review in the same session
+- apply `review:approved` or run `apply-review-verdict.sh`
+- run `merge-if-ready.sh` / `gh pr merge`
+
+Hooks soft-block these when `RELENTLESS_ROLE=implementer` or the same bash mixes push + review:approved.
+
+### Isolated REVIEWER
+Orchestrator **must** start the reviewer as a **separate** subagent / fresh session.
+
+**Pass ONLY** (use `build-review-bundle.sh` — lockfiles excluded):
+1. Issue text (acceptance criteria)
+2. PR diff (no `package-lock.json` / yarn.lock / etc.)
+3. QA / dogfood section
+
+- Claude: `claude -p --agent relentless:reviewer "$(cat review-bundle.md)"`
+- Codex: `codex exec --sandbox read-only "$(cat review-bundle.md)"`
+
+Reviewer is **read-only**. Orchestrator applies verdict via `apply-review-verdict.sh`.
+
+### FINAL step — merge-if-ready
+After `approved`, orchestrator **must** run (do not stall at approved-but-unmerged):
+
+```bash
+core/scripts/merge-if-ready.sh --repo OWNER/NAME --pr N --issue N
+```
+
+- `merge:auto` / config default `auto`: CI green on head SHA + `review:approved` → **merge commit** (`gh pr merge --merge`) → `state:done` → close issue
+- `merge:human`: post 🤖 ready-to-merge and wait
+
+CI wait: prefer `wait-ci.sh` / `gh run watch` after a run id exists (avoids `gh pr checks` “no checks reported” race).
 
 ## Merge policy
 - Default: `.relentless/config.json` → `merge.default` (`auto` | `human`)
 - Overrides: issue labels when `allow_issue_override` is true
 - Branch rulesets: **opt-in**, **fail-soft** at bootstrap
-- Pushing `.github/workflows/*` requires GitHub token scope **`workflow`** (`gh auth refresh -s workflow`)
+- Pushing `.github/workflows/*` requires GitHub token scope **`workflow`**
 
 ## Milestones
-Product outcomes, not work buckets. Guard with `milestone-guard` and:
+Product outcomes, not work buckets:
 
 ```bash
+core/scripts/create-milestone.sh --repo OWNER/NAME --title "User can …" \
+  --outcome "…" --exit-criterion "…"
 core/scripts/check-milestone-outcomes.sh --repo OWNER/NAME
 core/scripts/check-milestone-pending.sh --repo OWNER/NAME --milestone N
 ```
 
-**Do not close a milestone** while any of its open issues still has `human:pending`. Orchestrators must run the pending check first; exit code 1 means leave the milestone open.
+**Do not close a milestone** while any open issue still has `human:pending`.
 
 ## Dogfood QA
-The `qa` agent dogfoods this workflow (`dogfood-qa` skill) and writes a QA section. No separate Proof/provas product.
-
-Private repos / plans without GitHub Pages: do not require a Pages URL — use local preview (e.g. `npm run preview`) and note that in the QA section.
+`qa` agent + `dogfood-qa` skill. Prefer `fill-qa-section.sh`. README must match shipped features before milestone close.
 
 ## Bootstrap
 ```bash
 core/scripts/bootstrap.sh --check-scopes
-core/scripts/bootstrap.sh --repo OWNER/NAME --workdir /path/to/checkout          # dry-run (shows labels + seed plan)
-core/scripts/bootstrap.sh --repo OWNER/NAME --workdir /path/to/checkout --apply  # labels + seed files + CI template
+core/scripts/bootstrap.sh --repo OWNER/NAME --workdir PATH \
+  --merge-default auto --decider Marcelus          # dry-run
+core/scripts/bootstrap.sh --repo OWNER/NAME --workdir PATH \
+  --merge-default auto --decider Marcelus --apply  # labels + seeds + empty-repo initial commit
 ```
 
-Seeding (unless `--no-seed-files`): `.relentless/config.json`, issue + PR templates (with QA / dogfood), minimal CI workflow, `AGENTS.md` / `CLAUDE.md` stubs, Codex agent tomls.
+## Headless / CLI notes
+- Claude: `claude -p` buffers stdout when redirected — use `--output-format stream-json` for dogfoods.
+- Codex: `codex plugin list` is very verbose (curated catalog); confirm install amid noise or parse JSON if available. Prefer `~/.codex/plugins/cache/relentless/relentless/<ver>/` as `RELENTLESS_ROOT`.
+- See `docs/harness-profiles.md` and `docs/deferred-v1.1.md`.
 
-Empty repos need an initial commit before milestones work reliably.
-
-## Headless / CI auth (dogfood)
-- Claude Code: `CLAUDE_CODE_OAUTH_TOKEN` (or documented Claude CI auth) for non-interactive runs
-- Codex: API key / `codex login` device flow; for automation prefer env credentials documented by Codex for your plan
-- Relentless does not replace provider login — document tokens in the consumer CI secrets store
-
-## Out of scope
-- Product Upstream / BUS port
-- Proof (provas) surfaces
-- Automatic GitHub reviewer assignment (v1.1)
+## Out of scope / deferred
+- Product Upstream / BUS port; Proof (provas)
+- Automatic GitHub reviewer assignment; upstream Codex list filters — see `docs/deferred-v1.1.md`

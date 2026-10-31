@@ -1,56 +1,61 @@
 # Relentless
 
-Reusable **agent workflow plugin** for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [Codex CLI](https://github.com/openai/codex) (verified against **codex-cli 0.165.x**): GitHub issues & milestones as product outcomes, human decision gates, configurable merge policy, isolated reviewer.
+Reusable **agent workflow plugin** for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [Codex CLI](https://github.com/openai/codex) (verified against **codex-cli 0.165.x**): GitHub issues & milestones as product outcomes, human decision gates, configurable merge policy, isolated reviewer, **agent auto-merge**.
 
-## Install (Claude Code)
-
-```text
-/plugin install relentless --marketplace marcelusfernandes/relentless
-```
-
-## Install (Codex CLI)
-
-Codex discovers the repo marketplace at `.agents/plugins/marketplace.json`.
+## Install (Claude Code) — headless CLI
 
 ```bash
-# 1) Register this repo as a marketplace (GitHub shorthand)
+claude plugin marketplace add marcelusfernandes/relentless
+claude plugin install relentless@relentless -y
+```
+
+Interactive slash form also works: `/plugin install relentless --marketplace marcelusfernandes/relentless`.
+
+**Dogfood tip:** `claude -p` buffers stdout when redirected to a file. Prefer:
+
+```bash
+claude -p --output-format stream-json --dangerously-skip-permissions "…"
+```
+
+Find scripts: `claude plugin list --json` → `installPath` → export `RELENTLESS_ROOT=…`.
+
+## Install (Codex CLI) — headless CLI
+
+```bash
 codex plugin marketplace add marcelusfernandes/relentless
-
-# 2) Install the plugin from that marketplace
 codex plugin add relentless@relentless
-
-# Optional: refresh after updates
-codex plugin marketplace upgrade relentless
+codex plugin marketplace upgrade relentless   # after updates
 ```
 
-Local path alternative (clone first):
+Local path: `codex plugin marketplace add /absolute/path/to/relentless` then `codex plugin add relentless@relentless`.
 
-```bash
-codex plugin marketplace add /absolute/path/to/relentless
-codex plugin add relentless@relentless
-```
+Confirm with `codex plugin list` (verbose — dumps curated catalog; look for `relentless@relentless` enabled). Canonical scripts path:
 
-Do **not** confuse with Claude’s `/plugin install` — Codex uses `codex plugin marketplace add` + `codex plugin add`.
+`~/.codex/plugins/cache/relentless/relentless/<version>/` (prefer over `.tmp/marketplaces`).
 
-After install, start a **new** Codex session so skills/agents load. Confirm with `codex plugin list`.
+Start a **new** Codex session after install.
 
 ## Quick start (target repo)
 
-1. Ensure `gh` has the **`workflow`** scope (needed to seed CI):
+1. `gh auth refresh -s workflow` then `./core/scripts/bootstrap.sh --check-scopes`
+2. Bootstrap (empty repos get an initial commit on `--apply`):
    ```bash
-   gh auth refresh -s workflow
-   ./core/scripts/bootstrap.sh --check-scopes
+   ./core/scripts/bootstrap.sh --repo OWNER/NAME --workdir /path/to/checkout \
+     --merge-default auto --decider Marcelus
+   ./core/scripts/bootstrap.sh --repo OWNER/NAME --workdir /path/to/checkout \
+     --merge-default auto --decider Marcelus --apply
    ```
-2. Target repo must have an initial commit (default branch) before milestones.
-3. From the plugin root, dry-run then apply:
+3. Create outcome milestone + issues:
    ```bash
-   ./core/scripts/bootstrap.sh --repo OWNER/NAME --workdir /path/to/checkout
-   ./core/scripts/bootstrap.sh --repo OWNER/NAME --workdir /path/to/checkout --apply
+   ./core/scripts/create-milestone.sh --repo OWNER/NAME --title "User can …" \
+     --outcome "…" --exit-criterion "…"
+   ./core/scripts/create-issue.sh --repo OWNER/NAME --title "…" --milestone 1 --label merge:auto
    ```
-   Seeds labels, `.relentless/config.json`, issue + PR templates (with **QA / dogfood result**), minimal `.github/workflows/ci.yml`, `AGENTS.md` / `CLAUDE.md`, Codex agent stubs.
-4. Edit `.relentless/config.json` (`decider`, `merge.default`, `workers`).
-5. Human gates: decision-request template → `human:pending` → `/decide`.
-6. Review: orchestrator spawns **isolated** reviewer (issue + diff + QA only).
+4. Implement → QA → **stop at `state:review`** → isolated reviewer → `apply-review-verdict` → **`merge-if-ready`**.
+
+Harness profiles (Codex implementer bypass vs reviewer read-only; Claude `--agent relentless:reviewer`): **`docs/harness-profiles.md`**.
+
+Deferred items: **`docs/deferred-v1.1.md`**.
 
 ## Layout
 
@@ -58,12 +63,11 @@ After install, start a **new** Codex session so skills/agents load. Confirm with
 .agents/plugins/marketplace.json   Codex marketplace catalog
 .claude-plugin/                    Claude manifests
 .codex-plugin/ + plugin.json       Codex / Agent Plugins manifests
-.codex/agents/                     Codex agent stubs (incl. reviewer)
-agents/                            Claude agent briefs (incl. reviewer)
-skills/ commands/ hooks/           Runtime surfaces (hooks enforce)
+.codex/agents/                     Codex agent stubs
+agents/ skills/ commands/ hooks/   Runtime surfaces
 core/                              labels, templates, scripts, schemas
 AGENTS.md                          Doctrine (Claude + Codex)
-docs/PLAN.md                       Design plan
+docs/                              harness profiles, deferred, PLAN
 ```
 
 ## License

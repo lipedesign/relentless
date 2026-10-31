@@ -1,4 +1,5 @@
 name = "reviewer"
-description = "Isolated agnostic reviewer. Fresh context: issue acceptance criteria + PR diff + QA/dogfood only. Read-only. Structured verdict."
-# Full instructions: agents/reviewer.md
-# Isolation: orchestrator must spawn a separate `codex exec` (or `codex review`) with ONLY those inputs — never the implementer thread.
+description = "Isolated agnostic reviewer. Fresh context: issue AC + PR diff (no lockfiles) + QA only. Read-only."
+# Launch: codex exec --sandbox read-only  (or codex review --base main)
+# Inputs: output of build-review-bundle.sh ONLY — never implementer chat.
+# Full brief: agents/reviewer.md
