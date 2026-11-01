@@ -419,10 +419,18 @@ fi
 
 jq -n '[{created_at:"2026-02-01T00:00:00Z", body:"<!-- relentless:review-verdict verdict=\"approved\" -->"}]' >"$TMP/verdicts.json"
 run_merge
-if [[ "$rc" -ne 0 && "$out" == *"has no reviewed SHA"* && "$out" == *"Run a fresh review"* && "$log" != *"-X DELETE"* ]]; then
+if [[ "$rc" -ne 0 && "$out" == *"dry-run: would remove review:approved"* && "$out" == *"has no reviewed SHA"* && "$out" == *"Run a fresh review"* && "$log" != *"-X DELETE"* && "$log" != *"review%3Aapproved"* ]]; then
   ok
 else
-  bad "missing SHA should refuse without removing the label rc=$rc out=$out log=$log"
+  bad "dry-run missing SHA must not remove the label rc=$rc out=$out log=$log"
+fi
+
+jq -n '[{created_at:"2026-02-01T00:00:00Z", body:"<!-- relentless:review-verdict verdict=\"approved\" -->"}]' >"$TMP/verdicts.json"
+run_merge live
+if [[ "$rc" -ne 0 && "$out" == *"Removed review:approved"* && "$out" == *"has no reviewed SHA"* && "$out" == *"Run a fresh review"* && "$log" == *"-X DELETE"* && "$log" == *"review%3Aapproved"* ]]; then
+  ok
+else
+  bad "live missing SHA should remove the label rc=$rc out=$out log=$log"
 fi
 
 one_verdict "$SHORT"

@@ -54,7 +54,7 @@ core/scripts/close-epic.sh --repo OWNER/NAME --epic N
 ## Sub-issue authoring (apollo task + lohra sections)
 
 - Title: conventional `<type>: <short>` (or apollo `<type>(<scope>): …` if the repo uses scopes).
-- Body: `core/templates/issue-body.md` (User Story → … → References; QA/dogfood replaces Proof).
+- Body: `core/templates/issue-body.md` (User Story → … → References). QA is written on the PR, not as an empty issue section.
 - Exactly one type label: `bug` | `enhancement` | `documentation` | `investigation` (parents: `epic`).
 - Inherit the milestone; set **Dependencies** (`Blocked by: #N`).
 - Files = globs the PR may touch; keep one-PR-sized.

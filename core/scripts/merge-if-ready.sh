@@ -270,7 +270,22 @@ check_accepted_adr_decision_requests() {
 }
 
 # Latest review-verdict comment only. Compare its sha attribute to the full headRefOid.
-# Missing SHA refuses and leaves the label. A different value removes review:approved.
+# No SHA, or a different SHA, refuses the merge and removes review:approved.
+# --dry-run prints that removal and does not call the API.
+drop_review_approved() {
+  local why="$1"
+  if [[ "$DRY" -eq 1 ]]; then
+    echo "dry-run: would remove review:approved from issue #${ISSUE}. ${why} Refusing merge." >&2
+    exit 1
+  fi
+  if ! gh api -X DELETE "repos/${REPO}/issues/${ISSUE}/labels/review%3Aapproved" >/dev/null; then
+    echo "error: ${why} Could not remove review:approved. Refusing merge." >&2
+    exit 1
+  fi
+  echo "error: ${why} Removed review:approved. Refusing merge." >&2
+  exit 1
+}
+
 check_reviewed_head_sha() {
   local json="" rc=0 verdict_body="" sha="" sha_re=""
   set +e
@@ -292,8 +307,7 @@ check_reviewed_head_sha() {
     exit 1
   fi
   if [[ -z "$verdict_body" ]]; then
-    echo "error: PR #${PR} has no review verdict comment with a reviewed SHA. Refusing merge. Run a fresh review." >&2
-    exit 1
+    drop_review_approved "PR #${PR} has no review verdict comment with a reviewed SHA. Run a fresh review."
   fi
   sha=""
   # Stored in a variable so the angle bracket is part of the regex, not a redirect.
@@ -302,20 +316,10 @@ check_reviewed_head_sha() {
     sha="${BASH_REMATCH[1]}"
   fi
   if [[ -z "$sha" ]]; then
-    echo "error: latest review verdict on PR #${PR} has no reviewed SHA. Refusing merge. Run a fresh review." >&2
-    exit 1
+    drop_review_approved "Latest review verdict on PR #${PR} has no reviewed SHA. Run a fresh review."
   fi
   if [[ "$sha" != "$HEAD_SHA" ]]; then
-    if [[ "$DRY" -eq 1 ]]; then
-      echo "dry-run: would remove review:approved from issue #${ISSUE}. PR #${PR} head ${HEAD_SHA} does not match reviewed SHA ${sha}. Refusing merge." >&2
-      exit 1
-    fi
-    if ! gh api -X DELETE "repos/${REPO}/issues/${ISSUE}/labels/review%3Aapproved" >/dev/null; then
-      echo "error: PR #${PR} head ${HEAD_SHA} does not match reviewed SHA ${sha}. Could not remove review:approved. Refusing merge." >&2
-      exit 1
-    fi
-    echo "error: PR #${PR} head ${HEAD_SHA} does not match reviewed SHA ${sha}. Removed review:approved. Refusing merge." >&2
-    exit 1
+    drop_review_approved "PR #${PR} head ${HEAD_SHA} does not match reviewed SHA ${sha}."
   fi
 }
 
