@@ -1,10 +1,10 @@
 # ADR 0003 — CI quota exhaustion falls back to local checks run by merge-if-ready
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-10-31 (America/Sao_Paulo)
 - **Issue:** #16
 - **Human gate:** required (`human:pending` → `/decide`)
-- **Decided by:** _(filled by `/decide`)_
+- **Decided by:** human
 
 ## Context
 Private and organization repositories have GitHub Actions minute limits. When the quota or spending limit is hit, jobs do not run (`startup_failure`, billing annotations, or a completed run with no steps). Treating that as a red test makes agents edit correct code and retry CI.
@@ -24,7 +24,8 @@ A self-hosted runner is how to keep real Actions CI. The rule in Decision is the
 - Cons: autonomous waves stop at the quota even when local checks passed
 
 ## Decision
-Option 1, proposed. With `merge:auto`, if the local checks run by `merge-if-ready` pass and the head SHA is stable, `merge-if-ready` may merge without a human. `merge:human` still waits. Status stays **proposed** until the decider accepts this ADR. Silence is not acceptance.
+Option 1 accepted on 2026-10-31. merge:auto may merge on green local checks when CI is unavailable (quota).
+
 
 ## Consequences
 `merge-if-ready` merges on that path only when `review:approved`, the `ADRs:` line, and the stable head SHA still hold. A local check failure is a normal test failure and does not merge. No test command labels `human:pending` and does not merge. A self-hosted runner remains the way to keep GitHub-hosted CI.
