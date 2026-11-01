@@ -125,9 +125,12 @@ if [[ "$IS_EMPTY" == "true" || -z "$DEFAULT_BRANCH" ]]; then
         if [[ ! -f README.md ]]; then
           printf '# %s\n\nBootstrapped by Relentless.\n' "${REPO##*/}" > README.md
         fi
+        if [[ ! -f .gitignore ]]; then
+          cp "${TEMPLATES_ROOT}/gitignore" .gitignore
+        fi
         git config user.email >/dev/null 2>&1 || git config user.email "relentless-bot@users.noreply.github.com"
         git config user.name >/dev/null 2>&1 || git config user.name "Relentless Bootstrap"
-        git add README.md
+        git add README.md .gitignore
         if git commit -m "chore: initial commit" 2>/dev/null; then
           git push -u origin HEAD:main
           echo "empty-repo: pushed initial commit"
@@ -301,6 +304,8 @@ if [[ "$SEED_FILES" -eq 1 ]]; then
   seed_write "${TEMPLATES_ROOT}/github/ISSUE_TEMPLATE/epic.yml" ".github/ISSUE_TEMPLATE/epic.yml"
   seed_write "${TEMPLATES_ROOT}/github/ISSUE_TEMPLATE/config.yml" ".github/ISSUE_TEMPLATE/config.yml"
   seed_copy "${TEMPLATES_ROOT}/github/PULL_REQUEST_TEMPLATE.md" ".github/PULL_REQUEST_TEMPLATE.md"
+  # Starter ignore. Skip when the consumer already has one.
+  seed_copy "${TEMPLATES_ROOT}/gitignore" ".gitignore"
 
   # AGENTS.md / CLAUDE.md — idempotent delimited blocks
   if [[ -n "$WORKDIR" ]]; then

@@ -4,6 +4,8 @@ Agents **must not** self-review. Use separate processes with different permissio
 
 **Orchestrator owns the full loop:** after `state:review`, the **same orchestrator session** must spawn the isolated reviewer (nested process), apply the verdict, and run `merge-if-ready` — do **not** stop for a human/driver resume. Prefer `core/scripts/run-isolated-review.sh --merge`.
 
+Recommended orchestrator model: Codex sol 6.1 or astra; Claude Opus or Fable. This is a recommendation only. Agent files do not pin a model, and setup does not warn when another model is selected.
+
 ## Codex CLI
 
 Codex has no Claude PreToolUse hooks, and commands have no TTY even in the interactive TUI. The guard is `.codex/agents/<role>.toml` `developer_instructions`, derived from `agents/<role>.md` (worktree, stop at `state:review`, no commit or push on main, read-only reviewer, QA and documenter limits, and the decision rules). `tests/agents/test-codex-agent-briefs.py` fails if a TOML drops a normative line from its brief.

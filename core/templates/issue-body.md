@@ -31,11 +31,6 @@ none
 - [ ] Tests (when applicable)
 - [ ] Documentation updated (when applicable)
 
-## QA / dogfood
-- **Path exercised:**
-- **Result:** pass | fail | partial | N/A
-- **Gaps / follow-ups:**
-
 ## Files
 <!-- Globs this PR may touch. -->
 - `src/...`

@@ -75,17 +75,6 @@ body:
     validations:
       required: true
   - type: textarea
-    id: qa
-    attributes:
-      label: QA / dogfood
-      description: How we will exercise the path before review (replaces lohra-ts Proof; no prova runner in Relentless). Or "N/A — why" for docs/process-only work.
-      value: |
-        - Path exercised:
-        - Result: pass | fail | partial | N/A
-        - Gaps / follow-ups:
-    validations:
-      required: true
-  - type: textarea
     id: files
     attributes:
       label: Files
