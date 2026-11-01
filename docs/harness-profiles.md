@@ -65,11 +65,11 @@ Disabling the ceiling is a backstop. CI and reviewer waits still run in the fore
 export RELENTLESS_ROLE=reviewer
 export CLAUDE_AGENT=reviewer
 claude -p --agent relentless:reviewer \
-  --allowedTools "Read,Grep,Glob,Bash(gh *)" \
+  --allowedTools "Read,Grep,Glob,Bash(gh pr view *),Bash(gh pr diff *),Bash(gh pr checks *),Bash(gh issue view *),Bash(gh api --method GET *),Bash(gh api -X GET *)" \
   --verbose --output-format stream-json \
   < /tmp/review-bundle.md
 ```
-`run-isolated-review.sh` exports both names before the Claude spawn, the Claude fallback spawn, and the Codex spawn. The `relentless:reviewer` agent brief is read-only by doctrine. Prefer not combining with `--dangerously-skip-permissions` when the harness can restrict tools; if you must skip permissions for `gh` label writes, keep the session inputs to the bundle only and let the **orchestrator** run `apply-review-verdict.sh` + `merge-if-ready.sh`.
+`run-isolated-review.sh` exports both names before the Claude spawn, the Claude fallback spawn, and the Codex spawn. The `relentless:reviewer` agent brief is read-only by doctrine, and the Claude allowlist is read-only `gh` only: `gh pr view`, `gh pr diff`, `gh pr checks`, `gh issue view`, and `gh api` GET (`--method GET` or `-X GET`). It does not allow comment, edit, merge, label, review, or `gh api -X POST|PATCH|DELETE`. Prefer not combining with `--dangerously-skip-permissions`. Label writes and merge stay with the orchestrator (`apply-review-verdict.sh` and `merge-if-ready.sh`).
 
 One-shot (orchestrator):
 ```bash
