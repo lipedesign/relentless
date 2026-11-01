@@ -26,6 +26,6 @@ After the **isolated** reviewer returns and you run `apply-review-verdict.sh`:
 
 ## Helpers
 - `run-isolated-review.sh` — bundle + nested reviewer (stdin) + apply + optional `--merge`.
-- `wait-ci.sh --repo … --pr N` — foreground poll. Exit 3 means CI is still pending; re-run it on the next step. Do not background it.
+- `wait-ci.sh --repo … --pr N` — foreground poll. Exit 0 green, 1 real failure, 3 still pending (re-run on the next step), 4 `CI unavailable (quota)` (do not retry CI). Do not background it. On exit 4, `merge-if-ready` itself runs `checks.install`, `checks.lint`, `checks.typecheck`, `checks.test`, and `checks.build` in a clean worktree at the PR head. A local failure is exit 1. `merge:auto` may merge after a pass and posts `<!-- relentless:local-checks -->` plus label `ci:local`. `merge:human` does not merge.
 - `comment-agent.sh` — 🤖 + authorship marker without heredoc pain.
 - `build-review-bundle.sh` — issue + QA + diff with lockfiles stripped.

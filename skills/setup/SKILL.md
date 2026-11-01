@@ -17,7 +17,7 @@ Goal: the consumer repo works with Relentless end-to-end (labels, real CI, docs 
    - If stack detection finds no test command, **recommend human** and only set `auto` if the user insists (warn that merge-if-ready trusts CI).
 3. **decider.name** (and github login if not `gh api user`)
 4. **harness**: `claude` | `codex` | `both`
-5. **GitHub branch protection on main**: optional question, **off unless the user explicitly says yes**. Do not pass `--branch-protection` otherwise. Local git hooks are installed either way. When you ask, state plainly that on Codex without a sandbox the git-side hooks are advisory, since an agent can bypass them with `git push --no-verify` or `git -c core.hooksPath=/dev/null ...`, so branch protection is the only hard lock on `main` there. If they say yes, the apply command includes `--branch-protection` (fail-soft when the token cannot admin the repo).
+5. **GitHub branch protection on main**: optional question, **off unless the user explicitly says yes**. Do not pass `--branch-protection` otherwise. Local git hooks are installed either way. When you ask, state plainly that on Codex without a sandbox the git-side hooks are advisory, since an agent can bypass them with `git push --no-verify` or `git -c core.hooksPath=/dev/null ...`, so branch protection is the only hard lock on `main` there. If they say yes, the apply command includes `--branch-protection` (fail-soft when the token cannot admin the repo). In the same breath, warn that private and organization repositories have GitHub Actions minute limits. When the quota or spending limit is exhausted, the harness runs the configured checks locally on the PR head and notes that on the PR; `merge:auto` may merge and `merge:human` still waits for a person. A self-hosted runner is how to keep real Actions CI. The agent does not merge on local checks when the mode is `merge:human`. If no test command is configured, the run stops at `human:pending`.
 6. Optional: **first product outcome** text → after apply, create milestone + epic
 
 ## Plugin install (before or during)
@@ -98,7 +98,7 @@ If the user described a product outcome:
 | Issues | `relentless.yml` + `investigation.yml` + `epic.yml` + `config.yml` |
 | Config | `checks.{install,lint,typecheck,test,build}` + `stack` |
 | Git hooks | `.relentless/githooks/pre-commit` and `pre-push`. `core.hooksPath` points at them, or an existing hooksPath / husky is chained and not replaced. They refuse commits on main/master, pushes to main/master, and non-fast-forward pushes. |
-| Branch protection | **Off** unless the setup question was answered yes (`--branch-protection`, fail-soft). On Codex without a sandbox the git hooks are advisory (`git push --no-verify` or `git -c core.hooksPath=/dev/null ...`); branch protection is the only hard lock on `main` there. |
+| Branch protection | **Off** unless the setup question was answered yes (`--branch-protection`, fail-soft). On Codex without a sandbox the git hooks are advisory (`git push --no-verify` or `git -c core.hooksPath=/dev/null ...`); branch protection is the only hard lock on `main` there. Private and organization repos have Actions minute limits; when they are exhausted, `merge-if-ready` falls back to local checks and notes it on the PR. A self-hosted runner keeps real CI. `merge:human` still waits. |
 
 Never vendor plugin `agents/` / `skills/` into the consumer.
 

@@ -4,11 +4,21 @@
 # auto: require CI green on head SHA + review:approved → merge commit, state:done, close issue.
 # human: post 🤖 ready-to-merge and exit 0 without merging.
 #
-# Before either of those, refuses (exit 1, labels unchanged, no merge) unless the PR
+# Before either of those, refuses (exit 1, no merge) unless the PR
 # body has exactly one ADRs: line:
 #   ADRs: docs/decisions/adr/NNNN-slug.md[, …]   (each path must exist at the PR head)
 #   ADRs: none (<reason>)
-# Also refuses an accepted ADR in the diff when the linked issue has no decision-request.
+# An accepted ADR in the diff needs a decide.sh record on the linked issue or its
+# native sub-issue parent (not body text, and not an issue cited only in the ADR).
+# Otherwise the script posts
+# "blocked: ADR accepted without a verified decision-request" and exits 1.
+# It does not merge in either merge mode.
+#
+# CI: exit 0 green, 1 real failure, 3 pending, 4 quota with no local test command.
+# Quota (wait-ci exit 4 only) runs checks.install/lint/typecheck/test/build in a
+# clean worktree at the PR head. Local check failure is exit 1. With merge:auto,
+# a pass and a stable head SHA may merge without a human (ADR 0003, proposed).
+# merge:human waits. Agents do not supply this result.
 #
 # Before deleting the merged head branch, retargets open PRs that used it as base
 # (avoids GitHub closing dependents with base_ref_deleted).
@@ -144,10 +154,77 @@ check_pr_adrs_line() {
   return 0
 }
 
-# Accepted ADRs introduced by this PR need a prior decision-request on the linked issue.
-# Agents can write "Decided by" themselves; GitHub cannot tell that account from the human.
+# decide.sh writes author=human for decider.name plus relentless:decision option=.
+# A decision-request marker, "Decided by" prose, or an agent comment is not enough.
+# Issues named only inside the ADR are ignored: the agent writes that file.
+issue_has_verified_decision() {
+  local num="$1" comments="" decider_name="" needle=""
+  if [[ -n "${CONFIG:-}" && -f "$CONFIG" ]]; then
+    decider_name="$(jq -r '.decider.name // empty' "$CONFIG" 2>/dev/null || true)"  # intentional fail-soft
+  fi
+  [[ -n "$decider_name" && "$decider_name" != "null" ]] || return 1
+  set +e
+  comments="$(gh api --paginate "repos/${REPO}/issues/${num}/comments" --jq '.[].body' 2>/dev/null)"
+  local crc=$?
+  set -e
+  if [[ $crc -ne 0 ]]; then
+    return 1
+  fi
+  needle="relentless:author=human decider=\"${decider_name}\""
+  printf '%s\n' "$comments" | grep -F -q -- "$needle" || return 1
+  printf '%s\n' "$comments" | grep -E -q -- 'relentless:decision[[:space:]]+option=' || return 1
+  return 0
+}
+
+# Parent epic: GitHub native sub-issue parent only.
+# Parent:/Epic:/Part of lines are not read; agents write those.
+collect_parent_issues() {
+  local pnum=""
+  # intentional fail-soft: 404 means this issue is not a sub-issue
+  pnum="$(gh api "repos/${REPO}/issues/${ISSUE}/parent" --jq '.number // empty' 2>/dev/null)" || pnum=""
+  if [[ "$pnum" == "null" ]]; then
+    pnum=""
+  fi
+  if [[ "$pnum" =~ ^[0-9]+$ && "$pnum" != "$ISSUE" ]]; then
+    printf '%s\n' "$pnum"
+  fi
+}
+
+post_adr_decision_blocked() {
+  local body="" f="" n=""
+  body=$(cat <<EOF
+🤖 blocked: ADR accepted without a verified decision-request
+
+<!-- relentless:author=agent -->
+<!-- relentless:adr-decision-blocked -->
+
+blocked: ADR accepted without a verified decision-request
+
+ADRs:
+EOF
+)
+  for f in "$@"; do
+    body+=$'\n'"- https://github.com/${REPO}/blob/${HEAD_SHA}/${f}"
+  done
+  body+=$'\n\n'"Issues checked:"
+  for n in "${CHECKED_ISSUES[@]}"; do
+    body+=$'\n'"- https://github.com/${REPO}/issues/${n}"
+  done
+  echo "blocked: ADR accepted without a verified decision-request" >&2
+  echo "ADRs: $*" >&2
+  echo "Issues checked: ${CHECKED_ISSUES[*]}" >&2
+  echo "Agents must not accept ADRs. The decider runs decide.sh in their own terminal, outside the agent session." >&2
+  if [[ "$DRY" -eq 0 ]]; then
+    gh pr comment "$PR" --repo "$REPO" --body "$body"
+  fi
+  exit 1
+}
+
+# Accepted ADRs need a verified decide.sh record on the linked issue or its native sub-issue parent.
 check_accepted_adr_decision_requests() {
-  local files rc f b64 text status comments crc
+  local files="" rc=0 f="" b64="" text="" status="" parent=""
+  local -a accepted=()
+  CHECKED_ISSUES=()
   set +e
   files="$(gh api --paginate "repos/${REPO}/pulls/${PR}/files" --jq '.[].filename' 2>/dev/null)"
   rc=$?
@@ -167,58 +244,273 @@ check_accepted_adr_decision_requests() {
       echo "error: could not read ${f} at ${HEAD_SHA}; refusing merge (accepted-ADR check)" >&2
       exit 1
     fi
+    # intentional fail-soft: undecodable content is not an accepted ADR
     text="$(printf '%s' "$b64" | tr -d '[:space:]' | base64 -d 2>/dev/null || true)"
     status="$(printf '%s\n' "$text" | sed -n 's/^- \*\*Status:\*\*[[:space:]]*//p' | head -1 | tr '[:upper:]' '[:lower:]' | tr -d '\r')"
     [[ "$status" == "accepted" ]] || continue
-    set +e
-    comments="$(gh api --paginate "repos/${REPO}/issues/${ISSUE}/comments" --jq '.[].body' 2>/dev/null)"
-    crc=$?
-    set -e
-    if [[ $crc -ne 0 ]]; then
-      echo "error: issue #${ISSUE} comments unreadable; refusing merge while ${f} is accepted" >&2
-      exit 1
-    fi
-    if ! printf '%s\n' "$comments" | grep -q 'relentless:decision-request'; then
-      echo "error: ${f} is accepted in this PR but issue #${ISSUE} has no decision-request comment (<!-- relentless:decision-request -->). Refusing merge." >&2
-      echo "Agents must not accept ADRs. The decider runs decide.sh in their own terminal, outside the agent session." >&2
-      exit 1
-    fi
+    accepted+=("$f")
   done <<<"$files"
-  return 0
+  if [[ ${#accepted[@]} -eq 0 ]]; then
+    return 0
+  fi
+  CHECKED_ISSUES=("$ISSUE")
+  if issue_has_verified_decision "$ISSUE"; then
+    return 0
+  fi
+  while IFS= read -r parent; do
+    [[ "$parent" =~ ^[0-9]+$ ]] || continue
+    CHECKED_ISSUES+=("$parent")
+    if issue_has_verified_decision "$parent"; then
+      return 0
+    fi
+  done < <(collect_parent_issues)
+  post_adr_decision_blocked "${accepted[@]}"
 }
 
 check_pr_adrs_line
 check_accepted_adr_decision_requests
 
+trim_ws() {
+  local s="$1"
+  s="${s#"${s%%[![:space:]]*}"}"
+  s="${s%"${s##*[![:space:]]}"}"
+  printf '%s' "$s"
+}
+
+config_check_cmd() {
+  local key="$1" cmd=""
+  [[ -n "${CONFIG:-}" && -f "$CONFIG" ]] || return 0
+  cmd="$(jq -r --arg k "$key" '.checks[$k] // empty' "$CONFIG" 2>/dev/null || true)"  # intentional fail-soft
+  [[ "$cmd" == "null" ]] && cmd=""
+  trim_ws "$cmd"
+}
+
+# checks.test when set; else npm test when the worktree package.json has scripts.test.
+# Same resolution as hooks/scripts/stop-gate.sh, rooted at the PR head checkout.
+resolve_local_test_command() {
+  local root="$1" cmd="" pkg=""
+  cmd="$(config_check_cmd test)"
+  if [[ -n "$cmd" ]]; then
+    printf '%s' "$cmd"
+    return 0
+  fi
+  if [[ -f "${root}/package.json" ]] && command -v jq >/dev/null 2>&1; then
+    pkg="$(jq -r '.scripts.test // empty' "${root}/package.json" 2>/dev/null || true)"  # intentional fail-soft
+    [[ "$pkg" == "null" ]] && pkg=""
+    pkg="$(trim_ws "$pkg")"
+    if [[ -n "$pkg" ]]; then
+      printf '%s' "npm test"
+    fi
+  fi
+}
+
+LOCAL_WT=""
+cleanup_local_wt() {
+  local wt="${LOCAL_WT:-}"
+  [[ -n "$wt" ]] || return 0
+  LOCAL_WT=""
+  if [[ -d "$wt" ]]; then
+    # intentional fail-soft: the temp worktree may already have been removed
+    git worktree remove --force "$wt" >/dev/null 2>&1 || true
+    rm -rf "$wt"
+  fi
+}
+
+mark_quota_no_local_checks() {
+  local name="decider" f=""
+  cleanup_local_wt
+  if [[ -n "${CONFIG:-}" && -f "$CONFIG" ]]; then
+    name="$(jq -r '.decider.name // "decider"' "$CONFIG" 2>/dev/null || echo decider)"  # intentional fail-soft
+    [[ "$name" == "null" || -z "$name" ]] && name="decider"
+  fi
+  echo "CI unavailable (quota), no local checks" >&2
+  if [[ "$DRY" -eq 1 ]]; then
+    echo "would label human:pending for ${name}; not merging" >&2
+    exit 4
+  fi
+  f="$(mktemp)"
+  cat >"$f" <<EOF
+🤖 CI indisponível: cota do Actions esgotada
+
+<!-- relentless:author=agent -->
+<!-- relentless:decision-request -->
+
+## Question
+${name}: Actions minutes are exhausted and this repo has no local test command. How should we proceed?
+
+Reason: \`CI unavailable (quota), no local checks\`
+
+CI indisponível: cota do Actions esgotada
+
+## Context
+\`wait-ci\` classified the run as CI unavailable (quota). \`checks.test\` is empty and there is no npm test fallback at the PR head, so merge-if-ready will not merge.
+
+## Options
+
+### 1. Wait for Actions minutes or raise the spending limit
+- **Pros:** the next run is real CI
+- **Cons:** this PR stays blocked until the quota returns
+
+### 2. Add a self-hosted runner
+- **Pros:** Actions CI keeps running without hosted minutes
+- **Cons:** a machine to maintain
+
+### 3. A person runs the checks and merges under merge:human
+- **Pros:** unblocks this PR
+- **Cons:** not an agent merge
+
+## Recommendation
+**Option 2** — a self-hosted runner is how to keep real CI. Decider: ${name}.
+EOF
+  if [[ -n "${CONFIG:-}" ]]; then
+    "${SCRIPT_DIR}/request-decision.sh" --repo "$REPO" --issue "$ISSUE" --body-file "$f" --config "$CONFIG"
+  else
+    "${SCRIPT_DIR}/request-decision.sh" --repo "$REPO" --issue "$ISSUE" --body-file "$f"
+  fi
+  rm -f "$f"
+  exit 4
+}
+
+# Runs only after wait-ci.sh exits 4. Never trusts an agent comment.
+# Returns 0 when every configured check passed on this head SHA.
+run_local_checks_for_quota() {
+  local wt="" test_cmd="" key="" cmd="" log="" rc=0 failed=0
+  local report="" trunc="" new_json="" new_sha="" comment=""
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "error: local checks need a git checkout; not merging" >&2
+    exit 1
+  fi
+  if ! git cat-file -e "${HEAD_SHA}^{commit}" >/dev/null 2>&1; then
+    git fetch --no-tags origin "$HEAD_SHA" \
+      || git fetch --no-tags origin "pull/${PR}/head" \
+      || {
+        echo "error: PR head ${HEAD_SHA} is not available locally; not merging" >&2
+        exit 1
+      }
+  fi
+  wt="$(mktemp -d "${TMPDIR:-/tmp}/relentless-local-checks.XXXXXX")"
+  LOCAL_WT="$wt"
+  trap cleanup_local_wt RETURN
+  if ! git worktree add --detach "$wt" "$HEAD_SHA" >/dev/null; then
+    cleanup_local_wt
+    echo "error: could not check out ${HEAD_SHA} for local checks; not merging" >&2
+    exit 1
+  fi
+  test_cmd="$(resolve_local_test_command "$wt")"
+  if [[ -z "$test_cmd" ]]; then
+    mark_quota_no_local_checks
+  fi
+  report="$(mktemp)"
+  for key in install lint typecheck test build; do
+    if [[ "$key" == "test" ]]; then
+      cmd="$test_cmd"
+    else
+      cmd="$(config_check_cmd "$key")"
+    fi
+    [[ -n "$cmd" ]] || continue
+    log="$(mktemp)"
+    set +e
+    ( cd "$wt" && bash -c "$cmd" ) >"$log" 2>&1
+    rc=$?
+    set -e
+    trunc="$(tail -n 20 "$log" | head -c 800)"
+    {
+      echo "- \`${cmd}\` exit ${rc}"
+      echo
+      echo '```'
+      printf '%s\n' "$trunc"
+      echo '```'
+    } >>"$report"
+    rm -f "$log"
+    if [[ "$rc" -ne 0 ]]; then
+      failed=1
+      echo "local checks failed (exit ${rc}): ${cmd}" >&2
+      printf '%s\n' "$trunc" >&2
+      break
+    fi
+  done
+  cleanup_local_wt
+  if [[ "$failed" -ne 0 ]]; then
+    rm -f "$report"
+    echo "CI: failed" >&2
+    exit 1
+  fi
+  comment=$(cat <<EOF
+🤖 merge sem CI: CI unavailable (quota)
+
+<!-- relentless:author=agent -->
+<!-- relentless:local-checks -->
+
+merge sem CI: CI unavailable (quota)
+
+Tested head SHA: \`${HEAD_SHA}\`
+
+$(cat "$report")
+EOF
+)
+  rm -f "$report"
+  if [[ "$DRY" -eq 1 ]]; then
+    echo "local checks passed on ${HEAD_SHA}"
+    echo "$comment"
+    return 0
+  fi
+  gh pr comment "$PR" --repo "$REPO" --body "$comment"
+  gh issue edit "$ISSUE" --repo "$REPO" --add-label "ci:local"
+  new_json="$(gh pr view "$PR" --repo "$REPO" --json headRefOid)"
+  new_sha="$(jq -r '.headRefOid // empty' <<<"$new_json")"
+  if [[ -z "$new_sha" || "$new_sha" != "$HEAD_SHA" ]]; then
+    # intentional: still refuse the merge when the label API fails
+    if ! gh issue edit "$ISSUE" --repo "$REPO" --remove-label "ci:local"; then
+      echo "warn: could not remove ci:local after the head SHA changed" >&2
+    fi
+    echo "error: head SHA changed (${HEAD_SHA} -> ${new_sha:-unknown}); local checks invalid; not merging" >&2
+    exit 1
+  fi
+  echo "local checks passed on ${HEAD_SHA}"
+  return 0
+}
+
+# Poll wait-ci.sh. Quota (4) and real failure (1) are not retried.
 wait_ci() {
   local tries=0
   local max="${MERGE_CI_TRIES:-36}"
   local sleep_s="${MERGE_CI_SLEEP:-10}"
+  local timeout="${MERGE_CI_WAIT_TIMEOUT:-20}"
+  local rc=0
   while [[ $tries -lt $max ]]; do
-    local out rc
     set +e
-    out="$(gh pr checks "$PR" --repo "$REPO" 2>&1)"
+    "${SCRIPT_DIR}/wait-ci.sh" --repo "$REPO" --pr "$PR" --timeout-sec "$timeout"
     rc=$?
+    # Keep set +e across a non-zero return. With set -e, `return 4` exits the shell
+    # and the quota fallback in finish_ci never runs.
+    if [[ "$rc" -ne 3 ]]; then
+      return "$rc"
+    fi
     set -e
-    if [[ $rc -eq 0 ]]; then
-      echo "CI: green"
-      return 0
-    fi
-    if echo "$out" | grep -qiE 'fail|error|cancelled'; then
-      echo "CI: failed" >&2
-      echo "$out" >&2
-      return 1
-    fi
-    if echo "$out" | grep -qiE 'no checks reported'; then
-      echo "CI: pending (try $((tries+1))/$max) — no checks yet; this poll stays in the foreground"
-    else
-      echo "CI: pending (try $((tries+1))/$max)"
+    echo "CI: pending (try $((tries+1))/$max) — this poll stays in the foreground"
+    tries=$((tries + 1))
+    if [[ $tries -ge $max ]]; then
+      break
     fi
     sleep "$sleep_s"
-    tries=$((tries + 1))
   done
   echo "CI: pending — checks not green yet. Re-run merge-if-ready.sh in the foreground on the next step (exit 3)." >&2
+  set +e
   return 3
+}
+
+# Exit 1 on a real red run (no local fallback). On quota, run checks here.
+finish_ci() {
+  local rc=0
+  set +e
+  wait_ci
+  rc=$?
+  set -e
+  case "$rc" in
+    0) return 0 ;;
+    4) run_local_checks_for_quota; return 0 ;;
+    *) exit "$rc" ;;
+  esac
 }
 
 # Retarget open PRs whose base is HEAD_REF onto new_base. Returns 1 if any remain.
@@ -264,13 +556,13 @@ COMMENT
     echo "$BODY"
     exit 0
   fi
-  wait_ci
+  finish_ci
   gh pr comment "$PR" --repo "$REPO" --body "$BODY"
   echo "Posted ready-to-merge; not merging (merge:human)."
   exit 0
 fi
 
-wait_ci
+finish_ci
 
 if [[ "$DRY" -eq 1 ]]; then
   echo "dry-run: would retarget dependents of $HEAD_REF → $BASE_REF, then merge + delete-branch (if safe), state:done, close #$ISSUE"

@@ -216,6 +216,23 @@ def keywords(line: str) -> list[str]:
     return unique
 
 
+# Exact sentences that must appear in both the markdown brief and the Codex TOML.
+# Parity is the check. Do not accept a stripped token such as startupfailure in
+# place of the sentence.
+SENTENCE_PARITY = {
+    "implementer": [
+        "If wait-ci exits 4 (CI unavailable, quota), it is not a code failure: do not change code, do not retry CI, and do not run or report checks yourself. Set state:review and stop as usual; merge-if-ready runs the checks on the PR head after review.",
+    ],
+    "orchestrator": [
+        "If CI is red, read the failed job before touching code. If no test step ran (startup_failure, billing, spending limit, or minutes exhausted), it is not a code failure: do not change code, do not retry CI, and do not run or report checks yourself. Run merge-if-ready, which runs the checks on the PR head and decides. If it reports a local check failure, treat it as a normal test failure.",
+        "If merge-if-ready exits non-zero, never post its messages, apply merge labels or merge yourself. Quote its output on the issue, label it `human:pending` with the reason, and stop.",
+    ],
+}
+
+# The orchestrator owns merge-if-ready failures. The implementer stops at review.
+IMPLEMENTER_MUST_NOT = "If merge-if-ready exits non-zero, never post its messages, apply merge labels or merge yourself. Quote its output on the issue, label it `human:pending` with the reason, and stop."
+
+
 def developer_instructions(toml_text: str) -> str:
     match = re.search(
         r'developer_instructions\s*=\s*"""(.*?)"""',
@@ -243,14 +260,27 @@ def main() -> int:
             failures.append(f"{role}: developer_instructions missing or too short")
             continue
         lowered = instructions.lower()
+        # Same emphasis stripping as keywords(), so startup_failure matches
+        # without planting the glued token startupfailure in the brief.
+        normalized = re.sub(r"[*_]", "", lowered)
+        md_text = md_path.read_text()
         for name in DENY_NAMES:
             if name in lowered:
                 failures.append(f"{role}: hardcoded name {name!r} in developer_instructions")
         for phrase in CODEX_REQUIRED[role]:
             if phrase not in lowered:
                 failures.append(f"{role}: Codex rule missing from TOML: {phrase}")
-        for line in normative_lines(md_path.read_text()):
-            missing = [token for token in keywords(line) if token not in lowered]
+        for sentence in SENTENCE_PARITY.get(role, []):
+            if sentence not in md_text:
+                failures.append(f"{role}: markdown brief missing sentence: {sentence}")
+            if sentence not in instructions:
+                failures.append(f"{role}: TOML missing the same sentence: {sentence}")
+        if role == "implementer" and IMPLEMENTER_MUST_NOT in md_text:
+            failures.append("implementer: orchestrator merge-if-ready sentence leaked into the markdown brief")
+        if role == "implementer" and IMPLEMENTER_MUST_NOT in instructions:
+            failures.append("implementer: orchestrator merge-if-ready sentence leaked into the TOML")
+        for line in normative_lines(md_text):
+            missing = [token for token in keywords(line) if token not in lowered and token not in normalized]
             # A paraphrase may drop a function word. Require the concrete tokens
             # (code spans and the longer words) so a new prohibition in the brief
             # fails this check until the TOML covers it.

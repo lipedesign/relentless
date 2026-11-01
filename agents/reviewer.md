@@ -53,7 +53,7 @@ Verdict rule: any blocker or major finding, any unmet acceptance criterion, a mi
 ## Recommendation
 One short paragraph.
 
-Verdict: changes_requested
+Verdict: <approved|changes_requested>
 ```
 
 ## Agnostic stance

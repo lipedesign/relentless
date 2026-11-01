@@ -124,6 +124,11 @@
       "name": "orphan:ok",
       "color": "EDEDED",
       "description": "Explicit exception: issue may sit in a milestone without being a sub-issue of the parent epic"
+    },
+    {
+      "name": "ci:local",
+      "color": "FBCA04",
+      "description": "Local checks passed while GitHub Actions quota was unavailable; applied only by merge-if-ready"
     }
   ]
 }

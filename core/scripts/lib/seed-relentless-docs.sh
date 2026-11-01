@@ -63,7 +63,7 @@ Each implementer uses its own git worktree from fresh \`origin/main\` on \`<type
 Conventional commits + plain \`Closes #N\`. Explicit named failure (no silent \`|| true\` in project code).
 
 ## Git hooks
-\`.relentless/githooks/\` refuses commits on main/master, pushes to main/master, and non-fast-forward pushes. Setup points \`core.hooksPath\` there, or chains an existing hooksPath / husky without replacing it. GitHub branch protection stays **off** unless setup was explicitly answered yes.
+\`.relentless/githooks/\` refuses commits on main/master, pushes to main/master, and non-fast-forward pushes. Setup points \`core.hooksPath\` there, or chains an existing hooksPath / husky without replacing it. GitHub branch protection stays **off** unless setup was explicitly answered yes. Private and organization repositories have Actions minute limits; when they are exhausted, \`merge-if-ready\` runs local checks and notes it on the PR. A self-hosted runner keeps real CI. \`merge:human\` still waits for a person.
 
 ## Human decisions
 Do not run \`decide.sh\`, \`accept-adr.sh\`, or \`/decide\`, and do not write \`Decided by\`. ADRs stay **proposed**. With \`human:pending\`, post the decision request, tell the decider (\`decider.name\`) the exact \`decide.sh --repo … --issue N --option K\` command for their own terminal, and move on. A refusal is expected. On Claude, typing \`/decide\` is recorded by the UserPromptSubmit hook. Codex has no TTY, even in the interactive TUI.

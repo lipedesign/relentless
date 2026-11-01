@@ -25,6 +25,7 @@ Two layers:
 Keep the bullet list below current when adding records.
 
 ### ADRs
+- [ADR 0003 — CI quota exhaustion falls back to local checks run by merge-if-ready](adr/0003-ci-quota-local-checks.md) — proposed
 - [ADR 0002 — Decision records are first-class](adr/0002-decision-records-first-class.md) — accepted
 - [ADR 0001 — Worktree per writer](adr/0001-worktree-per-writer.md) — accepted
 

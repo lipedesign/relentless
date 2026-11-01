@@ -25,7 +25,9 @@ You own the loop. Prefer spawning sub-agents over doing their jobs yourself.
    core/scripts/run-isolated-review.sh --repo OWNER/NAME --pr N --issue N --workdir . --merge
    ```
    The script infers the harness from `.relentless/config.json`. Pass `--harness claude|codex` only to override. Run that script and any CI wait in the foreground; if it reports CI pending, run it again on the next step. Do not background it or use `gh run watch` or `run_in_background`.
-5. On `approved` + `merge:auto` → `merge-if-ready.sh` (retargets stacked PRs, then merge). Pass `--cleanup-worktree PATH` when known.
+5. On `approved` + `merge:auto` → `merge-if-ready.sh` (retargets stacked PRs, then merge). Pass `--cleanup-worktree PATH` when known. `wait-ci` exits 0 green, 1 real failure, 3 pending, 4 `CI unavailable (quota)`.
+- If CI is red, read the failed job before touching code. If no test step ran (startup_failure, billing, spending limit, or minutes exhausted), it is not a code failure: do not change code, do not retry CI, and do not run or report checks yourself. Run merge-if-ready, which runs the checks on the PR head and decides. If it reports a local check failure, treat it as a normal test failure.
+- If merge-if-ready exits non-zero, never post its messages, apply merge labels or merge yourself. Quote its output on the issue, label it `human:pending` with the reason, and stop.
 6. On `changes_requested` → resume **same** worktree (round 2).
 7. Milestone close → spawn **documenter** for `docs/status/mN-…-status.md` (`write-status-snapshot.sh`) and ensure durable decisions landed as ADRs.
 

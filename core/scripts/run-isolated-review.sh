@@ -53,6 +53,11 @@ read_verdict_line() {
       printf '%s\n' "${last#Verdict: }"
       return 0
       ;;
+    "Verdict: <approved|changes_requested>")
+      echo "error: refusing placeholder verdict line in ${file}: [${last}]" >&2
+      echo "error: that example is not a verdict. The last non-empty line must be exactly 'Verdict: approved' or 'Verdict: changes_requested'. No labels changed." >&2
+      return 1
+      ;;
     "")
       echo "error: missing verdict line in ${file}. The last non-empty line must be exactly 'Verdict: approved' or 'Verdict: changes_requested'. No labels changed." >&2
       return 1
@@ -137,12 +142,15 @@ export RELENTLESS_ROLE=reviewer
 export CLAUDE_AGENT=reviewer
 
 # Pass bundle via stdin/file — NEVER "$(cat bundle)" as argv (fails on large diffs).
+# Claude reviewer gh is read-only: view/diff/checks/issue view and GET api.
+# No comment, edit, merge, label, review, or api -X POST|PATCH|DELETE.
+REVIEWER_ALLOWED_TOOLS="Read,Grep,Glob,Bash(gh pr view *),Bash(gh pr diff *),Bash(gh pr checks *),Bash(gh issue view *),Bash(gh api --method GET *),Bash(gh api -X GET *)"
 case "$HARNESS" in
   claude)
     # stream-json requires --verbose on Claude Code 2.1.x+
     claude -p \
       --agent relentless:reviewer \
-      --allowedTools "Read,Grep,Glob,Bash(gh *)" \
+      --allowedTools "$REVIEWER_ALLOWED_TOOLS" \
       --verbose \
       --output-format stream-json \
       < "$PROMPT_FILE" \
@@ -158,7 +166,7 @@ case "$HARNESS" in
     fi
     if [[ ! -s "$VERDICT_RAW" ]]; then
       # Non-stream fallback
-      claude -p --agent relentless:reviewer --allowedTools "Read,Grep,Glob,Bash(gh *)" \
+      claude -p --agent relentless:reviewer --allowedTools "$REVIEWER_ALLOWED_TOOLS" \
         < "$PROMPT_FILE" > "$VERDICT_RAW" 2>>"${OUT_DIR}/reviewer.stderr.log" || true  # intentional fail-soft
     fi
     ;;
