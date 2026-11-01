@@ -52,7 +52,7 @@ if [[ -n "$PR" ]]; then
 fi
 
 post_verdict_comment() {
-  local title="$1" with_findings="${2:-0}" findings="" body_file=""
+  local title="$1" with_findings="${2:-0}" findings="" body_file="" rc=0
   [[ -n "$PR" ]] || return 0
   if [[ "$with_findings" -eq 1 ]]; then
     findings="$(collect_findings "$REVIEW_OUT")"
@@ -69,21 +69,33 @@ post_verdict_comment() {
       printf '%s\n' "$findings"
     fi
   } >"$body_file"
-  gh pr comment "$PR" --repo "$REPO" --body-file "$body_file" || true  # intentional fail-soft: labels already applied; comment is best-effort
+  set +e
+  gh pr comment "$PR" --repo "$REPO" --body-file "$body_file"
+  rc=$?
+  set -e
   rm -f "$body_file"
+  return "$rc"
 }
 
+# The SHA lives in the comment. Labels change only after that comment is posted.
+# A failed comment exits before any label write, so review:approved cannot exist without a SHA.
 case "$VERDICT" in
   approved)
-    gh api -X POST "repos/${REPO}/issues/${ISSUE}/labels" -f "labels[]=review:approved" >/dev/null || true  # intentional fail-soft
+    if ! post_verdict_comment "🤖 review:approved" 0; then
+      echo "error: could not post the review verdict on PR #${PR}. review:approved was not applied." >&2
+      exit 1
+    fi
+    gh api -X POST "repos/${REPO}/issues/${ISSUE}/labels" -f "labels[]=review:approved" >/dev/null || true  # intentional fail-soft: comment already holds the SHA
     set_issue_state "$REPO" "$ISSUE" "state:review" 1
-    post_verdict_comment "🤖 review:approved" 0
     echo "ok approved → review:approved + state:review (next: merge-if-ready.sh)"
     ;;
   changes_requested)
-    gh api -X DELETE "repos/${REPO}/issues/${ISSUE}/labels/review%3Aapproved" 2>/dev/null || true  # intentional fail-soft
+    if ! post_verdict_comment "🤖 changes_requested — back to state:in-progress" 1; then
+      echo "error: could not post the review verdict on PR #${PR}. No labels were changed." >&2
+      exit 1
+    fi
+    gh api -X DELETE "repos/${REPO}/issues/${ISSUE}/labels/review%3Aapproved" 2>/dev/null || true  # intentional fail-soft: label may already be absent
     set_issue_state "$REPO" "$ISSUE" "state:in-progress" 1
-    post_verdict_comment "🤖 changes_requested — back to state:in-progress" 1
     echo "ok changes_requested → state:in-progress"
     ;;
   *) echo "verdict must be approved|changes_requested" >&2; exit 2 ;;

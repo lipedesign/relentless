@@ -30,6 +30,10 @@ if [[ "$1" == "pr" && "$2" == "comment" ]]; then
     fi
     prev="$arg"
   done
+  if [[ "${GH_COMMENT_FAIL:-}" == "1" ]]; then
+    echo "comment failed" >&2
+    exit 1
+  fi
   exit 0
 fi
 if [[ "$1" == "api" ]]; then
@@ -110,6 +114,24 @@ if [[ "$rc" -eq 0 && "$out" == *"verdict: approved"* && "$log" == *"review:appro
   ok
 else
   bad "last line approved rc=$rc out=$out log=$log body=$body err=$(cat "$work/err")"
+fi
+
+# A failed verdict comment must exit before any label write.
+reset_gh
+export GH_COMMENT_FAIL=1
+out="$(
+  PATH="$TMP:$PATH" \
+    "$ROOT/core/scripts/apply-review-verdict.sh" --repo o/r --issue 7 --pr 7 --verdict approved \
+    --workdir "$TMP" 2>"$TMP/fail-comment.err"
+)"
+rc=$?
+unset GH_COMMENT_FAIL
+log="$(cat "$GH_LOG")"
+err="$(cat "$TMP/fail-comment.err")"
+if [[ "$rc" -ne 0 && "$err" == *"review:approved was not applied"* && "$log" == *"pr comment"* && "$log" != *"gh api"* && "$log" != *"labels[]=review:approved"* ]]; then
+  ok
+else
+  bad "failed comment must not apply review:approved rc=$rc err=$err log=$log out=$out"
 fi
 
 # rule quoted earlier ends on the other word; the final line wins
@@ -296,8 +318,11 @@ else
   ok
 fi
 
-# A second method flag or --input is blocked in pretool-reviewer-isolation.sh.
-# The allowlist star cannot express that, and REVIEWER_ALLOWED_TOOLS stays as written.
+# Repeated method flags and --input are fail-closed in tests/hooks/test-hooks.sh
+# (pretool-reviewer-isolation.sh, exit 2): `gh api -X GET foo -X POST` and
+# `gh api --method GET foo --input body.json`, plus the attached and mixed forms.
+# REVIEWER_ALLOWED_TOOLS is unchanged. This file only checks that one explicit
+# GET with -f/-F still matches the allowlist.
 
 # merge-if-ready: the latest verdict SHA must equal the full headRefOid.
 FULL="0123456789abcdef0123456789abcdef01234567"
@@ -346,6 +371,10 @@ EOF
 chmod +x "$TMP/gh"
 
 run_merge() {
+  local dry=(--dry-run)
+  if [[ "${1:-}" == "live" ]]; then
+    dry=()
+  fi
   : >"$TMP/gh.log"
   out="$(
     PATH="$TMP:$PATH" \
@@ -353,7 +382,7 @@ run_merge() {
     GH_HEAD_SHA="$FULL" \
     GH_VERDICT_JSON="$GH_VERDICT_JSON" \
     "$ROOT/core/scripts/merge-if-ready.sh" --repo o/r --pr 7 --issue 9 \
-      --config "$TMP/merge-config.json" --dry-run 2>&1
+      --config "$TMP/merge-config.json" "${dry[@]}" 2>&1
   )"
   rc=$?
   log="$(cat "$TMP/gh.log")"
@@ -374,10 +403,18 @@ fi
 
 one_verdict "$OTHER"
 run_merge
-if [[ "$rc" -ne 0 && "$out" == *"does not match reviewed SHA ${OTHER}"* && "$out" == *"Removed review:approved"* && "$log" == *"-X DELETE"* && "$log" == *"review%3Aapproved"* ]]; then
+if [[ "$rc" -ne 0 && "$out" == *"dry-run: would remove review:approved"* && "$out" == *"does not match reviewed SHA ${OTHER}"* && "$log" != *"-X DELETE"* && "$log" != *"review%3Aapproved"* ]]; then
   ok
 else
-  bad "different head should refuse and remove label rc=$rc out=$out log=$log"
+  bad "dry-run SHA mismatch must not remove the label rc=$rc out=$out log=$log"
+fi
+
+one_verdict "$OTHER"
+run_merge live
+if [[ "$rc" -ne 0 && "$out" == *"Removed review:approved"* && "$out" == *"does not match reviewed SHA ${OTHER}"* && "$log" == *"-X DELETE"* && "$log" == *"review%3Aapproved"* ]]; then
+  ok
+else
+  bad "live SHA mismatch should remove the label rc=$rc out=$out log=$log"
 fi
 
 jq -n '[{created_at:"2026-02-01T00:00:00Z", body:"<!-- relentless:review-verdict verdict=\"approved\" -->"}]' >"$TMP/verdicts.json"
@@ -390,7 +427,7 @@ fi
 
 one_verdict "$SHORT"
 run_merge
-if [[ "$rc" -ne 0 && "$out" == *"does not match reviewed SHA ${SHORT}"* && "$out" != *"matches"* && "$log" == *"-X DELETE"* ]]; then
+if [[ "$rc" -ne 0 && "$out" == *"dry-run: would remove review:approved"* && "$out" == *"does not match reviewed SHA ${SHORT}"* && "$log" != *"-X DELETE"* ]]; then
   ok
 else
   bad "abbreviated SHA must not match rc=$rc out=$out log=$log"
@@ -402,7 +439,7 @@ jq -n --arg full "$FULL" --arg other "$OTHER" '[
   {created_at:"2026-01-01T00:00:00Z", body: ("<!-- relentless:review-verdict verdict=\"approved\" sha=\"" + $full + "\" -->")}
 ]' >"$TMP/verdicts.json"
 run_merge
-if [[ "$rc" -ne 0 && "$out" == *"does not match reviewed SHA ${OTHER}"* && "$log" == *"-X DELETE"* ]]; then
+if [[ "$rc" -ne 0 && "$out" == *"dry-run: would remove review:approved"* && "$out" == *"does not match reviewed SHA ${OTHER}"* && "$log" != *"-X DELETE"* ]]; then
   ok
 else
   bad "latest differing SHA should win rc=$rc out=$out log=$log"
@@ -484,6 +521,36 @@ if [[ "$rc" -eq 0 && "$log" == *"commented"* && "$log" != *"edited"* && ! -e "$G
   ok
 else
   bad "no-patch-body should comment only rc=$rc log=$log"
+fi
+
+# Every plugin manifest and marketplace entry carries the same version.
+manifests=(
+  plugin.json
+  .claude-plugin/plugin.json
+  .codex-plugin/plugin.json
+  marketplace/marketplace.json
+  .claude-plugin/marketplace.json
+  .agents/plugins/marketplace.json
+)
+seen=""
+version_bad=""
+for f in "${manifests[@]}"; do
+  v="$(jq -r 'if .plugins then [.plugins[].version] | join(" ") else .version end' "$ROOT/$f")"
+  if [[ -z "$v" || "$v" == "null" ]]; then
+    version_bad="$f has no version"
+    break
+  fi
+  if [[ -z "$seen" ]]; then
+    seen="$v"
+  elif [[ "$v" != "$seen" ]]; then
+    version_bad="$f is $v, expected $seen"
+    break
+  fi
+done
+if [[ -n "$version_bad" || "$seen" != "1.4.7" ]]; then
+  bad "manifest versions: ${version_bad:-seen=$seen}"
+else
+  ok
 fi
 
 echo "pass=$PASS fail=$FAIL"

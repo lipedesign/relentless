@@ -306,6 +306,10 @@ check_reviewed_head_sha() {
     exit 1
   fi
   if [[ "$sha" != "$HEAD_SHA" ]]; then
+    if [[ "$DRY" -eq 1 ]]; then
+      echo "dry-run: would remove review:approved from issue #${ISSUE}. PR #${PR} head ${HEAD_SHA} does not match reviewed SHA ${sha}. Refusing merge." >&2
+      exit 1
+    fi
     if ! gh api -X DELETE "repos/${REPO}/issues/${ISSUE}/labels/review%3Aapproved" >/dev/null; then
       echo "error: PR #${PR} head ${HEAD_SHA} does not match reviewed SHA ${sha}. Could not remove review:approved. Refusing merge." >&2
       exit 1
