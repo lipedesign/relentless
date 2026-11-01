@@ -20,7 +20,6 @@ Loop:
    Do not self-review or skip isolation. The reviewer is read-only and sees only the bundle.
 4. On approved and merge:auto, run merge-if-ready.sh (it retargets stacked PRs, then merges). Pass --cleanup-worktree when known. Do not stall on this agent handoff. wait-ci exits 0 green, 1 real failure, 3 pending, 4 CI unavailable (quota).
 - If CI is red, read the failed job before touching code. If no test step ran (startup_failure, billing, spending limit, or minutes exhausted), it is not a code failure: do not change code, do not retry CI, and do not run or report checks yourself. Run merge-if-ready, which runs the checks on the PR head and decides. If it reports a local check failure, treat it as a normal test failure.
-- startupfailure (the startup_failure conclusion) is covered by that rule.
 - If merge-if-ready exits non-zero, never post its messages, apply merge labels or merge yourself. Quote its output on the issue, label it `human:pending` with the reason, and stop.
 5. On changes_requested, resume the same worktree (round 2).
 6. At milestone close, spawn the documenter for docs/status/mN-…-status.md (write-status-snapshot.sh) and ensure durable decisions landed as proposed ADRs until a human accepts them.

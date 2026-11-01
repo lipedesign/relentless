@@ -164,5 +164,24 @@ else
   bad "malformed verdict rc=$rc out=$out err=$(cat "$work/err") log=$(cat "$GH_LOG")"
 fi
 
+# the brief's example placeholder is not a verdict
+reset_gh
+work="$TMP/placeholder"
+mkdir -p "$work"
+cat >"$work/review.md" <<'EOF'
+## Findings
+1. **[nit]** rename the helper
+
+Verdict: <approved|changes_requested>
+EOF
+out="$(run_from "$work" "$work/review.md" 2>"$work/err")"
+rc=$?
+err="$(cat "$work/err")"
+if [[ "$rc" -ne 0 && "$err" == *"refusing placeholder verdict line"* && "$err" == *"Verdict: <approved|changes_requested>"* && "$err" == *"No labels changed"* && ! -s "$GH_LOG" ]]; then
+  ok
+else
+  bad "placeholder verdict rc=$rc out=$out err=$err log=$(cat "$GH_LOG")"
+fi
+
 echo "pass=$PASS fail=$FAIL"
 [[ $FAIL -eq 0 ]]

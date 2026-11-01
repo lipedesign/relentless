@@ -53,6 +53,11 @@ read_verdict_line() {
       printf '%s\n' "${last#Verdict: }"
       return 0
       ;;
+    "Verdict: <approved|changes_requested>")
+      echo "error: refusing placeholder verdict line in ${file}: [${last}]" >&2
+      echo "error: that example is not a verdict. The last non-empty line must be exactly 'Verdict: approved' or 'Verdict: changes_requested'. No labels changed." >&2
+      return 1
+      ;;
     "")
       echo "error: missing verdict line in ${file}. The last non-empty line must be exactly 'Verdict: approved' or 'Verdict: changes_requested'. No labels changed." >&2
       return 1
