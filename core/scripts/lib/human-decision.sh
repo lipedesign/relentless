@@ -63,7 +63,7 @@ relentless_accept_adr_apply() {
   local file="$1" option="$2" decider="$3" note="${4:-}"
   local date decision_line
   date="$(TZ=America/Sao_Paulo date +%Y-%m-%d)"
-  decision_line="Option ${option} accepted on ${date}."
+  decision_line="Decided ${date} (new decision): option ${option}."
   [[ -n "$note" ]] && decision_line+=" ${note}"
   ADR_FILE="$file" ADR_OPTION="$option" ADR_DECIDER="$decider" ADR_DECISION="$decision_line" \
     python3 << 'PY'

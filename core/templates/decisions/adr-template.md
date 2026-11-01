@@ -24,7 +24,7 @@ What forces the decision? Constraints, prior art, dogfood friction.
 - Cons: …
 
 ## Decision
-_(filled when accepted — which option and the verifiable rule)_
+Shows only the current decision. History lives in `docs/decisions/log.jsonl`.
 
 ## Consequences
 Positive / negative / follow-ups.

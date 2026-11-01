@@ -351,6 +351,7 @@ if [[ "$SEED_FILES" -eq 1 ]]; then
 
   # Decision records (first-class) + status + follow-up + worktreeinclude
   seed_copy "${TEMPLATES_ROOT}/decisions/README.md" "docs/decisions/README.md"
+  seed_copy "${TEMPLATES_ROOT}/decisions/log.jsonl" "docs/decisions/log.jsonl"
   seed_copy "${TEMPLATES_ROOT}/decisions/adr-template.md" "docs/decisions/adr/TEMPLATE.md"
   seed_copy "${TEMPLATES_ROOT}/decisions/note-template.md" "docs/decisions/notes/TEMPLATE.md"
   seed_copy "${TEMPLATES_ROOT}/status-mN.md" "docs/status/TEMPLATE.md"

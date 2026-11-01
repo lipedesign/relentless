@@ -305,18 +305,48 @@ else
   ok
 fi
 
+decision_section() {
+  awk 'BEGIN{p=0} /^## Decision$/{p=1; next} /^## /{if (p) exit} p && NF {print}' "$1"
+}
+
 : >"$GH_LOG"
 out="$(
   unset RELENTLESS_ROLE CODEX_THREAD_ROLE CLAUDE_AGENT AGENT_NAME
   run_pty "$ROOT/core/scripts/accept-adr.sh" --file "$ADR" --option 2 --decider Ada --note "ship it"
 )"
 rc=$?
+decision_date="$(TZ=America/Sao_Paulo date +%Y-%m-%d)"
+first_marker="Decided ${decision_date} (new decision): option 2. ship it"
 if [[ "$rc" -ne 0 ]]; then
   bad "human accept-adr.sh failed ($rc): $out"
 elif ! grep -q '^\- \*\*Status:\*\* accepted$' "$ADR"; then
   bad "human accept-adr.sh did not set accepted: $(grep Status "$ADR")"
 elif ! grep -q '^\- \*\*Decided by:\*\* Ada$' "$ADR"; then
   bad "human accept-adr.sh did not set Decided by: $(grep 'Decided by' "$ADR")"
+elif [[ "$(decision_section "$ADR")" != "$first_marker" ]]; then
+  bad "human accept-adr.sh decision body: $(decision_section "$ADR")"
+elif grep -q 'Option .* accepted on ' "$ADR"; then
+  bad "human accept-adr.sh kept the old acceptance line"
+else
+  ok
+fi
+
+out="$(
+  unset RELENTLESS_ROLE CODEX_THREAD_ROLE CLAUDE_AGENT AGENT_NAME
+  run_pty "$ROOT/core/scripts/accept-adr.sh" --file "$ADR" --option 3 --decider Ada --note "replaced"
+)"
+rc=$?
+second_marker="Decided ${decision_date} (new decision): option 3. replaced"
+if [[ "$rc" -ne 0 ]]; then
+  bad "second accept-adr.sh failed ($rc): $out"
+elif [[ "$(decision_section "$ADR")" != "$second_marker" ]]; then
+  bad "second decide did not replace the decision: $(decision_section "$ADR")"
+elif grep -qF "$first_marker" "$ADR"; then
+  bad "second decide left the previous marker"
+elif ! grep -q '^\- \*\*Status:\*\* accepted$' "$ADR"; then
+  bad "second decide changed Status"
+elif ! grep -q '^\- \*\*Decided by:\*\* Ada$' "$ADR"; then
+  bad "second decide changed Decided by"
 else
   ok
 fi
@@ -627,6 +657,71 @@ assert_blocked_no_merge "none + merge:auto"
 export GH_MERGE_LABEL="merge:human"
 run_merge_live
 assert_blocked_no_merge "none + merge:human"
+
+# Each ADR index row status equals the Status field in that ADR file.
+index_mismatch=""
+index_rows=0
+in_adrs=0
+while IFS= read -r row || [[ -n "$row" ]]; do
+  if [[ "$row" == "### ADRs" ]]; then
+    in_adrs=1
+    continue
+  fi
+  if [[ "$in_adrs" -eq 1 && "$row" == "### "* ]]; then
+    break
+  fi
+  [[ "$in_adrs" -eq 1 && "$row" == "- ["* ]] || continue
+  index_rows=$((index_rows + 1))
+  rel="${row#*](}"
+  rel="${rel%%)*}"
+  idx_status="${row##* — }"
+  adr_file="$ROOT/docs/decisions/${rel}"
+  if [[ ! -f "$adr_file" ]]; then
+    index_mismatch="$rel missing"
+    break
+  fi
+  file_status="$(sed -n 's/^- \*\*Status:\*\* //p' "$adr_file" | head -n 1)"
+  if [[ "$idx_status" != "$file_status" ]]; then
+    index_mismatch="$rel index=$idx_status file=$file_status"
+    break
+  fi
+done <"$ROOT/docs/decisions/README.md"
+if [[ -n "$index_mismatch" ]]; then
+  bad "ADR index status: $index_mismatch"
+elif [[ "$index_rows" -eq 0 ]]; then
+  bad "ADR index status: no ADR rows"
+else
+  ok
+fi
+
+# Bootstrap seed: empty decision log, and both decision READMEs point at it.
+log_template="$ROOT/core/templates/decisions/log.jsonl"
+log_live="$ROOT/docs/decisions/log.jsonl"
+log_bad=""
+if [[ ! -f "$log_template" || -s "$log_template" ]]; then
+  log_bad="decision log template is missing or not empty"
+elif [[ ! -f "$log_live" ]]; then
+  log_bad="docs/decisions/log.jsonl is missing"
+elif ! grep -q 'docs/decisions/log.jsonl' "$ROOT/docs/decisions/README.md"; then
+  log_bad="docs/decisions/README.md does not point at the log"
+elif ! grep -q 'docs/decisions/log.jsonl' "$ROOT/core/templates/decisions/README.md"; then
+  log_bad="decisions README template does not point at the log"
+elif ! grep -q 'seed_copy "${TEMPLATES_ROOT}/decisions/log.jsonl" "docs/decisions/log.jsonl"' "$ROOT/core/scripts/bootstrap.sh"; then
+  log_bad="bootstrap does not seed the decision log"
+else
+  while IFS= read -r log_line || [[ -n "$log_line" ]]; do
+    [[ -z "$log_line" ]] && continue
+    if ! printf '%s' "$log_line" | jq -e 'keys as $k | (["ts","kind","from","to","issue","pr","adr","option","summary","decider","commit"] - $k | length == 0) and (.kind == "human_decide" or .kind == "merge" or .kind == "auto_merge_no_ci" or .kind == "changes_requested" or .kind == "state_change")' >/dev/null; then
+      log_bad="decision log line is not one JSON object with the log fields: $log_line"
+      break
+    fi
+  done <"$log_live"
+fi
+if [[ -n "$log_bad" ]]; then
+  bad "$log_bad"
+else
+  ok
+fi
 
 echo "pass=$PASS fail=$FAIL"
 [[ $FAIL -eq 0 ]]

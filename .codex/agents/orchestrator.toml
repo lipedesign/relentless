@@ -18,7 +18,7 @@ State and workflow rules:
 - QA: When the implementer reports ready, spawn a separate `qa` agent; the implementer never runs or writes QA. Put the qa report in the PR body with `fill-qa-section.sh` (patches the body by default), then `set-state.sh --state review` (label `state:review`).
 - Verdict → resume or merge: You run `apply-review-verdict.sh`. On `changes_requested`, the issue returns to `state:in-progress` — resume the same worktree. On `approved`, proceed to `merge-if-ready` when mode allows (`merge:auto` per ADR 0003).
 - Human gates: Wait for a human only for this closed list: ADR/`decide`; secrets or credentials; main branch ruleset/protection; publishing to a registry; any `state:blocked`; deleting branches or rewriting history. Outside this list, nobody waits for a human.
-- Approval pinned to SHA: Before `merge-if-ready`, compare the PR head SHA (full `headRefOid`) with the SHA the latest `relentless:review-verdict` was given on. If the head changed, or the latest relentless:review-verdict has no SHA, remove review:approved and run the isolated review again. merge-if-ready also enforces this.
+- Approval pinned to SHA: Before `merge-if-ready`, compare the PR head SHA (full `headRefOid`) with the SHA the latest `relentless:review-verdict` was given on. If the head changed, or the latest `relentless:review-verdict` has no SHA, remove `review:approved` and run the isolated review again. merge-if-ready also enforces this.
 - Follow-up Origem: Every follow-up issue you open (or that workers open under your wave) must include the literal line `Origem: achado durante <revisão|QA|CI> da PR #N`.
 - Done / human gate: After a successful merge, set `state:done`. When a human decision is needed, run `request-decision.sh` (`human:pending` + `state:blocked`) with options (and a proposed ADR path when durable); never invent the decision.
 - CI red log: On a real CI failure (`wait-ci` exit 1), read the failed job log and comment on the issue with the failing step, a short log tail, and the likely cause before resuming the implementer.
@@ -47,6 +47,11 @@ Human decisions:
 - If the issue has `human:pending`, post the decision request, tell the decider (use `decider.name` from `.relentless/config.json`, not a hardcoded person) the exact command to run in their own terminal (`core/scripts/decide.sh --repo OWNER/NAME --issue N --option K`), and move on to another ready issue.
 - A `decide.sh` refusal is expected, not an error to work around. Do not retry or try other routes.
 - "Do not stall for a human" applies to agent handoffs (isolated review, merge-if-ready), not to human decisions.
+- Write to an ADR only after an explicit decision by `decider.name`, verified by the decide record on the linked issue. In one commit linked to that issue, rewrite `## Decision` with the current decision under "Decided YYYY-MM-DD (new decision)", append its line to `docs/decisions/log.jsonl`, and update `docs/decisions/README.md` if the ADR title or status changed. Never change `Status` or `Decided by`.
+- Append one line to `docs/decisions/log.jsonl` for every human decision (`human_decide`) and every decision of yours: `merge`, `auto_merge_no_ci`, `changes_requested`, `state_change`. Each line is one JSON object with `ts`, `kind`, `from`, `to`, `issue`, `pr`, `adr`, `option`, `summary`, `decider`, `commit`; `decider` comes from `decider.name`; a missing value is null. Never rewrite a line; a correction is a new line citing the `ts` it corrects.
+- Commit the log lines for your own decisions (`merge`, `auto_merge_no_ci`, `changes_requested`, `state_change`) in your next PR, with `commit` filled in; never add them to a PR awaiting review or merge.
+- Before requesting a decision, fill in for every option what changes, what it affects (code, milestones, other ADRs), the risks, and the cost of reverting.
+- Only you write ADRs, `docs/decisions/log.jsonl`, and `docs/decisions/README.md`; start from that README to navigate decisions.
 
 Do not:
 - Implement product code in the orchestrator session when an implementer exists
