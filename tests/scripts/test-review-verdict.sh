@@ -296,32 +296,8 @@ else
   ok
 fi
 
-# A trailing * consumes the rest of the command, so these cannot be excluded
-# by the current allowedTools globs. The case records that gap instead of
-# failing the suite or adding a wrapper.
-gap_cmds=(
-  "gh api -X GET foo -X POST"
-  "gh api --method GET foo --method POST"
-  "gh api -X GET foo --input body.json"
-  "gh api --method GET foo --input body.json"
-)
-gap_hits=()
-for cmd in "${gap_cmds[@]}"; do
-  for pat in "${patterns[@]}"; do
-    if allows "$pat" "$cmd"; then
-      gap_hits+=("$pat allows $cmd")
-      break
-    fi
-  done
-done
-if [[ ${#gap_hits[@]} -eq 0 ]]; then
-  ok
-elif [[ ${#gap_hits[@]} -eq ${#gap_cmds[@]} ]]; then
-  echo "allowlist-gap: allowedTools globs cannot exclude a repeated method flag or --input combined with GET, because * consumes the rest of the command"
-  ok
-else
-  bad "allowlist gap is partial: ${gap_hits[*]}"
-fi
+# A second method flag or --input is blocked in pretool-reviewer-isolation.sh.
+# The allowlist star cannot express that, and REVIEWER_ALLOWED_TOOLS stays as written.
 
 # merge-if-ready: the latest verdict SHA must equal the full headRefOid.
 FULL="0123456789abcdef0123456789abcdef01234567"

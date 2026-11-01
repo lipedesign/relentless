@@ -69,7 +69,7 @@ claude -p --agent relentless:reviewer \
   --verbose --output-format stream-json \
   < /tmp/review-bundle.md
 ```
-`run-isolated-review.sh` exports both names before the Claude spawn, the Claude fallback spawn, and the Codex spawn. The `relentless:reviewer` agent brief is read-only by doctrine, and the Claude allowlist is read-only `gh` only: `gh pr view`, `gh pr diff`, `gh pr checks`, `gh issue view`, and `gh api` GET (`--method GET` or `-X GET`). It does not allow comment, edit, merge, label, review, or `gh api -X POST|PATCH|DELETE`. Prefer not combining with `--dangerously-skip-permissions`. Label writes and merge stay with the orchestrator (`apply-review-verdict.sh` and `merge-if-ready.sh`).
+`run-isolated-review.sh` exports both names before the Claude spawn, the Claude fallback spawn, and the Codex spawn. The `relentless:reviewer` agent brief is read-only by doctrine, and the Claude allowlist is read-only `gh` only: `gh pr view`, `gh pr diff`, `gh pr checks`, `gh issue view`, and `gh api` GET (`--method GET` or `-X GET`). It does not allow comment, edit, merge, label, review, or `gh api -X POST|PATCH|DELETE`. The allowlist star matches the rest of the command, so `pretool-reviewer-isolation.sh` blocks a reviewer `gh api` that has a second `-X`/`--method` (including `-XPOST` and `--method=POST`) or any `--input`. One explicit GET with `-f` or `-F` stays allowed. Prefer not combining with `--dangerously-skip-permissions`. Label writes and merge stay with the orchestrator (`apply-review-verdict.sh` and `merge-if-ready.sh`).
 
 One-shot (orchestrator):
 ```bash
