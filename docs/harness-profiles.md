@@ -55,7 +55,7 @@ CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
 
 After the model ends a turn, print mode waits for background tasks and then stops the session. The default ceiling is `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` (10 minutes). The process prints `Background tasks still running … stopping them` and dies, so a dogfood wave needs a manual continue. Set `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` to disable that ceiling, or set a high millisecond value to raise it.
 
-Disabling the ceiling is a backstop. CI and reviewer waits still run in the foreground: `wait-ci.sh` polls and exits 3 with `CI: pending` when its budget is spent, and the next step runs it again. `run-isolated-review.sh` blocks until the reviewer exits. Do not background those commands, and do not use `gh run watch` or `run_in_background` for them — a watcher stays alive after the turn and is what trips the ceiling.
+Disabling the ceiling is a backstop. CI and reviewer waits still run in the foreground: `wait-ci.sh` polls and exits 3 with `CI: pending` when its budget is spent, and the next step runs it again. Exit 0 is green, 1 is a real failure, 4 is `CI unavailable (quota)` (do not retry CI; `merge-if-ready` runs local checks). `run-isolated-review.sh` blocks until the reviewer exits. Do not background those commands, and do not use `gh run watch` or `run_in_background` for them — a watcher stays alive after the turn and is what trips the ceiling.
 
 ### Reviewer (restricted tools)
 ```bash
@@ -93,7 +93,7 @@ export RELENTLESS_ROOT="<installPath>"
 
 # Codex — prefer cache path, not .tmp marketplaces clone
 # ~/.codex/plugins/cache/relentless/relentless/<version>/
-export RELENTLESS_ROOT=~/.codex/plugins/cache/relentless/relentless/1.4.5
+export RELENTLESS_ROOT=~/.codex/plugins/cache/relentless/relentless/1.4.6
 ```
 
 ## Project-scoped plugin install
@@ -116,7 +116,7 @@ Agents share the human's GitHub identity. There is no marker file or env token t
 core/scripts/decide.sh --repo OWNER/NAME --issue N --option K
 ```
 
-With the sandbox disabled, a process that allocates its own terminal lowers but does not eliminate the risk. `merge-if-ready` also refuses a PR that adds or changes an **accepted** ADR when the linked issue has no `<!-- relentless:decision-request -->` comment.
+With the sandbox disabled, a process that allocates its own terminal lowers but does not eliminate the risk. `merge-if-ready` posts `blocked: ADR accepted without a verified decision-request` and exits non-zero, without merging, when the diff has an accepted ADR and neither the linked issue nor its native sub-issue parent has a `decide.sh` record (`relentless:author=human` for `decider.name` and `relentless:decision`). Body lines such as `Parent:` / `Epic:` / `Part of #N`, and an issue cited only inside the ADR, do not count. `merge:auto` and `merge:human` both stop.
 
 If the issue has `human:pending`, post the decision request, tell the decider (`decider.name` from config, not a hardcoded person) that command, and move on to another ready issue.
 
@@ -127,7 +127,7 @@ Setup / `bootstrap.sh` installs `.relentless/githooks/pre-commit` and `pre-push`
 - Unset `core.hooksPath` → set it to `.relentless/githooks`. An existing executable `.git/hooks/pre-commit` or `pre-push` is still chained.
 - Existing `core.hooksPath` (husky or otherwise) → left unchanged; the hook files gain one `# relentless:githooks` chain call. Re-running does not duplicate it.
 - They refuse commits on `main`/`master`, pushes that update `refs/heads/main` or `refs/heads/master`, and non-fast-forward pushes. The pre-push hook sees the old and new SHAs, not the `--force` flag, so a fast-forward update is allowed even if the client passed `--force`. The agent PreToolUse hook still blocks every force-push spelling (`-f`, `--force`, `--force-with-lease`, `+refspec`) before git runs.
-- GitHub branch protection on main is **not** enabled by default. Setup asks; pass `--branch-protection` only after an explicit yes (fail-soft). On Codex without a sandbox the git-side hooks are advisory, since an agent can bypass them with `git push --no-verify` or `git -c core.hooksPath=/dev/null ...`, so branch protection is the only hard lock on `main` there.
+- GitHub branch protection on main is **not** enabled by default. Setup asks; pass `--branch-protection` only after an explicit yes (fail-soft). On Codex without a sandbox the git-side hooks are advisory, since an agent can bypass them with `git push --no-verify` or `git -c core.hooksPath=/dev/null ...`, so branch protection is the only hard lock on `main` there. Private and organization repositories also have GitHub Actions minute limits. When that quota or the spending limit is exhausted, `merge-if-ready` runs the configured checks locally on the PR head and notes that on the PR; `merge:auto` may merge and `merge:human` still waits. A self-hosted runner is how to keep real Actions CI.
 
 ## Stop hook (Claude)
 

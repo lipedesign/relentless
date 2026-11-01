@@ -55,6 +55,7 @@ gh auth refresh -s workflow
 | **Labels** | Idempotent create/edit |
 | **Git hooks** | `.relentless/githooks/pre-commit` and `pre-push`. Sets `core.hooksPath` to that directory, or chains an existing hooksPath / husky without replacing it. Refuses commits on `main`/`master`, pushes to `main`/`master`, and non-fast-forward (force) pushes. |
 | **Branch protection** | **Off** unless you pass `--branch-protection` after an explicit yes in setup. Fail-soft if the token cannot admin the repo. On Codex without a sandbox the git hooks are advisory (`git push --no-verify` or `git -c core.hooksPath=/dev/null ...`); branch protection is the only hard lock on `main` there. |
+| **Actions minutes** | Private and organization repositories have GitHub Actions minute limits. When the quota or spending limit is exhausted, `merge-if-ready` runs the configured checks locally on the PR head, notes the result on the PR, and may merge only under `merge:auto`. `merge:human` still waits for a person. A self-hosted runner is how to keep real Actions CI. With no test command, the issue stops at `human:pending` and nothing is merged. |
 
 Setup then commits seeds on `chore/relentless-setup` and opens a PR (empty repos may seed `main` first).
 

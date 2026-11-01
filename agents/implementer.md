@@ -20,7 +20,9 @@ description: Implement issue AC in its own git worktree from origin/main on <typ
 - Move issue `state:todo` → `state:in-progress` via `set-state.sh`; assign worker.
 - Implement against acceptance criteria; open PR linked with `Closes #N`.
 - On ambiguity: **human-gate** (and ADR if durable).
-- Wait for CI in the foreground with `wait-ci.sh` (re-run it if pending). Do not background it or use `gh run watch`.
+- Wait for CI in the foreground with `wait-ci.sh` (re-run it if pending). Do not background it or use `gh run watch`. Exit 0 is green, 1 is a real failure, 3 is pending, 4 is `CI unavailable (quota)`.
+- If CI is red, read the failed job before touching code. If no test step ran (startup_failure, billing, spending limit, or minutes exhausted), it is not a code failure: do not change code, do not retry CI, and do not run or report checks yourself. Run merge-if-ready, which runs the checks on the PR head and decides. If it reports a local check failure, treat it as a normal test failure.
+- If merge-if-ready exits non-zero, never post its messages, apply merge labels or merge yourself. Quote its output on the issue, label it `human:pending` with the reason, and stop.
 - Fill QA (or hand off to qa) via `fill-qa-section.sh`.
 - Set `state:review` and **STOP**. Do **not** spawn reviewer, apply `review:approved`, or merge.
 - On round 2, read the latest `relentless:review-verdict` comment on the PR and address every blocker and major before pushing; reply to each one in the PR.

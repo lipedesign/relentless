@@ -106,7 +106,7 @@ core/scripts/merge-if-ready.sh --repo OWNER/NAME --pr N --issue N
 - `merge:auto` / config default `auto`: CI green on head SHA + `review:approved` → retarget open PRs stacked on the head branch → **merge commit** (`gh pr merge --merge`) → delete branch only if safe → `state:done` → close issue
 - `merge:human`: post 🤖 ready-to-merge and wait
 
-CI wait: `wait-ci.sh` polls in the foreground (exit 3 means pending — re-run it on the next step). Do not background it or use `gh run watch`.
+CI wait: `wait-ci.sh` polls in the foreground (exit 0 green, 1 failed, 3 pending — re-run it on the next step, 4 `CI unavailable (quota)` — do not retry CI). Do not background it or use `gh run watch`. On exit 4, `merge-if-ready` runs the configured checks locally; the agent does not.
 
 ## Merge policy
 - Default: `.relentless/config.json` → `merge.default` (`auto` | `human`)

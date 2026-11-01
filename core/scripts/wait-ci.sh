@@ -6,9 +6,12 @@
 #
 # One invocation polls until --timeout-sec (default 30), then returns:
 #   0  CI green
-#   1  CI failed
+#   1  CI failed (a test or other real job ran and failed)
 #   2  usage error
 #   3  CI pending — re-run this script in the foreground on the next step
+#   4  CI unavailable (quota) — billing, spending limit, minutes exhausted,
+#      startup_failure, or a completed run whose jobs executed no steps.
+#      Not a test failure. Do not retry this script in a loop.
 #
 # Usage: wait-ci.sh --repo OWNER/NAME --pr N [--timeout-sec 30]
 set -euo pipefail
@@ -20,7 +23,7 @@ while [[ $# -gt 0 ]]; do
     --timeout-sec) TIMEOUT="${2:-}"; shift 2 ;;
     -h|--help)
       echo "Usage: $(basename "$0") --repo OWNER/NAME --pr N [--timeout-sec 30]"
-      echo "Exit 0 green, 1 failed, 3 pending (re-run in the foreground)."
+      echo "Exit 0 green, 1 failed, 3 pending (re-run in the foreground), 4 CI unavailable (quota)."
       exit 0 ;;
     *) echo "Unknown: $1" >&2; exit 2 ;;
   esac
@@ -40,6 +43,65 @@ pending() {
   exit 3
 }
 
+quota_exit() {
+  echo "CI unavailable (quota)" >&2
+  exit 4
+}
+
+# True when text mentions Actions billing / quota rather than a test assertion.
+text_is_quota() {
+  grep -qiE 'billing|spending[[:space:]]+limit|minutes[[:space:]]+exhausted|out of minutes|minute quota'
+}
+
+# Inspect a completed non-success run. Returns 0 when it is quota, 1 otherwise.
+# A jobs-API miss is not quota: merge-if-ready must not run local checks unless
+# this script classified the run.
+run_is_quota() {
+  local id="$1"
+  local view="" sha="" blob="" ann="" job_id="" rc=0
+  set +e
+  view="$(gh run view "$id" --repo "$REPO" --json jobs,headSha,conclusion 2>/dev/null)"
+  rc=$?
+  set -e
+  if [[ $rc -ne 0 || -z "$view" ]]; then
+    return 1
+  fi
+  set +e
+  jq -e '
+    (.jobs // []) as $j
+    | if ($j | length) == 0 then true
+      elif any($j[]; .conclusion == "startup_failure") then true
+      elif all($j[]; ((.steps // []) | length) == 0) then true
+      else false end
+  ' <<<"$view" >/dev/null
+  rc=$?
+  set -e
+  if [[ $rc -eq 0 ]]; then
+    return 0
+  fi
+  sha="$(jq -r '.headSha // empty' <<<"$view" 2>/dev/null || true)"  # intentional fail-soft: missing head SHA skips check-run text
+  blob=""
+  if [[ -n "$sha" ]]; then
+    set +e
+    blob="$(gh api "repos/${REPO}/commits/${sha}/check-runs" 2>/dev/null)"
+    set -e
+  fi
+  while IFS= read -r job_id; do
+    [[ "$job_id" =~ ^[0-9]+$ ]] || continue
+    set +e
+    ann="$(gh api "repos/${REPO}/check-runs/${job_id}/annotations" 2>/dev/null)"
+    rc=$?
+    set -e
+    if [[ $rc -eq 0 && -n "$ann" ]]; then
+      blob+="$ann"$'\n'
+    fi
+  done < <(jq -r '.jobs[]?.databaseId // empty' <<<"$view" 2>/dev/null || true)  # intentional fail-soft: no job ids means no annotations to read
+  if printf '%s\n' "$blob" | text_is_quota; then
+    return 0
+  fi
+  return 1
+}
+
 while (( SECONDS < deadline )); do
   raw="$(gh run list --repo "$REPO" --branch "$BRANCH" --limit 1 --json databaseId,status,conclusion 2>/dev/null || true)"  # intentional fail-soft: no run yet is pending, not a failure
   run_id="" status="" conclusion=""
@@ -55,7 +117,13 @@ while (( SECONDS < deadline )); do
         echo "CI green (run $run_id)"
         exit 0
         ;;
-      failure|cancelled|timed_out|startup_failure|action_required)
+      startup_failure)
+        quota_exit
+        ;;
+      failure|cancelled|timed_out|action_required)
+        if run_is_quota "$run_id"; then
+          quota_exit
+        fi
         echo "CI failed (run $run_id conclusion=$conclusion)" >&2
         exit 1
         ;;
@@ -69,6 +137,10 @@ while (( SECONDS < deadline )); do
   if [[ $rc -eq 0 ]]; then
     echo "CI green"
     exit 0
+  fi
+  # Quota before the generic fail match: "startup_failure" contains "fail".
+  if printf '%s\n' "$out" | grep -qiE 'startup_failure' || printf '%s\n' "$out" | text_is_quota; then
+    quota_exit
   fi
   if echo "$out" | grep -qiE 'fail|error|cancelled'; then
     echo "CI failed" >&2
