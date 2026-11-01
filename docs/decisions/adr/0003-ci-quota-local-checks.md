@@ -11,7 +11,7 @@ Private and organization repositories have GitHub Actions minute limits. When th
 
 `wait-ci.sh` exits 4 with `CI unavailable (quota)` and does not retry. Only `merge-if-ready.sh` may then run `checks.install`, `checks.lint`, `checks.typecheck`, `checks.test`, and `checks.build` in a clean worktree at the PR head. It posts `<!-- relentless:local-checks -->`, applies `ci:local`, and re-reads the head SHA before merging. A real test failure stays exit 1 and does not take this path. If `checks.test` resolves to nothing, it labels `human:pending` and does not merge. `merge:human` still waits.
 
-A self-hosted runner is how to keep real Actions CI. This ADR does not accept a permanent merge policy.
+A self-hosted runner is how to keep real Actions CI. The rule in Decision is the owner's selection. This record stays proposed until the decider accepts it.
 
 ## Options
 
@@ -24,12 +24,10 @@ A self-hosted runner is how to keep real Actions CI. This ADR does not accept a 
 - Cons: autonomous waves stop at the quota even when local checks passed
 
 ## Decision
-_(filled when accepted)_
-
-Open question: whether option 1 or option 2. The current script implements option 1 so a quota hit is not a false red build. That behavior is not accepted until this ADR is decided. Silence is not approval.
+Option 1, proposed. With `merge:auto`, if the local checks run by `merge-if-ready` pass and the head SHA is stable, `merge-if-ready` may merge without a human. `merge:human` still waits. Status stays **proposed** until the decider accepts this ADR. Silence is not acceptance.
 
 ## Consequences
-Positive / negative / follow-ups.
+`merge-if-ready` merges on that path only when `review:approved`, the `ADRs:` line, and the stable head SHA still hold. A local check failure is a normal test failure and does not merge. No test command labels `human:pending` and does not merge. A self-hosted runner remains the way to keep GitHub-hosted CI.
 
 Agents must not run or report the checks themselves, and must not merge when `merge-if-ready` exits non-zero. They quote its output, label `human:pending`, and stop.
 

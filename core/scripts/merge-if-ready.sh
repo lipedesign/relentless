@@ -16,8 +16,9 @@
 #
 # CI: exit 0 green, 1 real failure, 3 pending, 4 quota with no local test command.
 # Quota (wait-ci exit 4 only) runs checks.install/lint/typecheck/test/build in a
-# clean worktree at the PR head. Local check failure is exit 1. merge:auto may
-# merge after a passing run; merge:human waits. Agents do not supply this result.
+# clean worktree at the PR head. Local check failure is exit 1. With merge:auto,
+# a pass and a stable head SHA may merge without a human (ADR 0003, proposed).
+# merge:human waits. Agents do not supply this result.
 #
 # Before deleting the merged head branch, retargets open PRs that used it as base
 # (avoids GitHub closing dependents with base_ref_deleted).

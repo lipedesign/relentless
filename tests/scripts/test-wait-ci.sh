@@ -327,6 +327,7 @@ run_merge() {
   rc=$?
 }
 
+# ADR 0003 (proposed): merge:auto may merge when local checks pass on a stable head SHA.
 write_cfg "$TMP/install.sh" "$TMP/test-ok.sh"
 run_merge
 log="$(cat "$TMP/gh.log")"
@@ -386,6 +387,7 @@ else
   bad "no test command rc=$rc out=$out log=$log"
 fi
 
+# ADR 0003 (proposed): merge:human still waits even when local checks pass.
 MERGE_LABEL="merge:human"
 write_cfg "$TMP/install.sh" "$TMP/test-ok.sh"
 run_merge
