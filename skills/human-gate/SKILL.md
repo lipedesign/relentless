@@ -18,7 +18,9 @@ If the options change architecture, a public contract, merge/security policy, or
 Ephemeral tactical choices may use `--no-adr`.
 
 ## Flow
-1. Draft body → `core/scripts/request-decision.sh --repo … --issue N --body-file …`
+Only the orchestrator runs `request-decision.sh`. That script writes `human:pending` and swaps the issue to `state:blocked`. Workers report the question and the options; they do not write those labels.
+
+1. Orchestrator drafts the body → `core/scripts/request-decision.sh --repo … --issue N --body-file …`
    - Adds `human:pending`
    - **Swaps** to `state:blocked` (removes other `state:*`; never stacks)
    - Assigns `decider.github`

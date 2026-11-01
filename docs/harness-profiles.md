@@ -6,7 +6,7 @@ Agents **must not** self-review. Use separate processes with different permissio
 
 ## Codex CLI
 
-Codex has no Claude PreToolUse or Stop hooks, and commands have no TTY even in the interactive TUI. The guard is `.codex/agents/<role>.toml` `developer_instructions`, derived from `agents/<role>.md` (worktree, stop at `state:review`, no commit or push on main, read-only reviewer, QA and documenter limits, and the decision rules). `tests/agents/test-codex-agent-briefs.py` fails if a TOML drops a normative line from its brief.
+Codex has no Claude PreToolUse hooks, and commands have no TTY even in the interactive TUI. The guard is `.codex/agents/<role>.toml` `developer_instructions`, derived from `agents/<role>.md` (worktree, stop at `state:review`, no commit or push on main, read-only reviewer, QA and documenter limits, and the decision rules). `tests/agents/test-codex-agent-briefs.py` fails if a TOML drops a normative line from its brief.
 
 ### Implementer / orchestrator (needs git + gh)
 ```bash
@@ -69,7 +69,7 @@ claude -p --agent relentless:reviewer \
   --verbose --output-format stream-json \
   < /tmp/review-bundle.md
 ```
-`run-isolated-review.sh` exports both names before the Claude spawn, the Claude fallback spawn, and the Codex spawn. The `relentless:reviewer` agent brief is read-only by doctrine, and the Claude allowlist is read-only `gh` only: `gh pr view`, `gh pr diff`, `gh pr checks`, `gh issue view`, and `gh api` GET (`--method GET` or `-X GET`). It does not allow comment, edit, merge, label, review, or `gh api -X POST|PATCH|DELETE`. Prefer not combining with `--dangerously-skip-permissions`. Label writes and merge stay with the orchestrator (`apply-review-verdict.sh` and `merge-if-ready.sh`).
+`run-isolated-review.sh` exports both names before the Claude spawn, the Claude fallback spawn, and the Codex spawn. The `relentless:reviewer` agent brief is read-only by doctrine, and the Claude allowlist is read-only `gh` only: `gh pr view`, `gh pr diff`, `gh pr checks`, `gh issue view`, and `gh api` GET (`--method GET` or `-X GET`). It does not allow comment, edit, merge, label, review, or `gh api -X POST|PATCH|DELETE`. The allowlist star matches the rest of the command, so `pretool-reviewer-isolation.sh` blocks a reviewer `gh api` that has a second `-X`/`--method` (including `-XPOST` and `--method=POST`) or any `--input`. One explicit GET with `-f` or `-F` stays allowed. Prefer not combining with `--dangerously-skip-permissions`. Label writes and merge stay with the orchestrator (`apply-review-verdict.sh` and `merge-if-ready.sh`).
 
 One-shot (orchestrator):
 ```bash
@@ -129,13 +129,9 @@ Setup / `bootstrap.sh` installs `.relentless/githooks/pre-commit` and `pre-push`
 - They refuse commits on `main`/`master`, pushes that update `refs/heads/main` or `refs/heads/master`, and non-fast-forward pushes. The pre-push hook sees the old and new SHAs, not the `--force` flag, so a fast-forward update is allowed even if the client passed `--force`. The agent PreToolUse hook still blocks every force-push spelling (`-f`, `--force`, `--force-with-lease`, `+refspec`) before git runs.
 - GitHub branch protection on main is **not** enabled by default. Setup asks; pass `--branch-protection` only after an explicit yes (fail-soft). On Codex without a sandbox the git-side hooks are advisory, since an agent can bypass them with `git push --no-verify` or `git -c core.hooksPath=/dev/null ...`, so branch protection is the only hard lock on `main` there. Private and organization repositories also have GitHub Actions minute limits. When that quota or the spending limit is exhausted, `merge-if-ready` runs the configured checks locally on the PR head and notes that on the PR. With `merge:auto`, a pass on a stable head SHA may merge without a human. `merge:human` still waits. A self-hosted runner is how to keep real Actions CI. Proposed in `docs/decisions/adr/0003-ci-quota-local-checks.md`.
 
-## Stop hook (Claude)
+## End of turn
 
-`hooks/scripts/stop-gate.sh` runs on the Stop event.
-
-- Stdin `stop_hook_active: true` exits 0 immediately, so a blocked stop cannot loop.
-- It still blocks a dirty Relentless worktree, `state:in-progress` with nothing pushed, and an open PR with no `## QA` section.
-- It blocks when project tests fail. The command is `.relentless/config.json` key `checks.test` when that string is non-empty. Otherwise, if `package.json` has `scripts.test`, the command is `npm test`. No command skips this gate and the other checks still run. The run is capped at 120s (`RELENTLESS_STOP_GATE_TEST_TIMEOUT`). The Stop hook `timeout` in `hooks/hooks.json` stays above that cap (150s) so a timeout can still print its reason.
+There is no Claude Stop hook. The implementer brief is the rule: tests pass, and nothing is left uncommitted, before report back. QA checks a turn that slips through. `checks.test` is still the project test command written into CI, and `merge-if-ready` runs it on the PR head when Actions quota skips CI.
 
 ## Hook regression tests
 

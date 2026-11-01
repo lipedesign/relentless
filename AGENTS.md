@@ -28,7 +28,7 @@ There are **no** `complexity:*` labels. Work too big for one session/PR → epic
 
 `state:blocked` pairs with `human:pending` when waiting on a person.
 
-Use `core/scripts/set-state.sh` (quiet by default) for every state transition.
+Only the orchestrator runs `core/scripts/set-state.sh` (quiet by default) for every state transition. Workers do not write `state:*` labels.
 
 ## Milestones → epic → sub-issues
 1. `create-milestone.sh` — title `Theme: subtitle`; description has outcome, deliverable, validates-with, depends-on, exit criterion.
@@ -162,7 +162,7 @@ Stack detection writes real `relentless-ci.yml` (or FAIL-closed if no test). Ups
 ## Worktree per writer (PR9)
 - Skill `worktree-segura`; scripts `worktree-create.sh` / `worktree-cleanup.sh`.
 - Branch `<type>/<n>-<slug>` from fresh `origin/main` only. Remote push = lock.
-- Hooks: `pretool-protect-main`, `pretool-protect-worktree-write`, `stop-gate` (Claude). Codex: honor the same rules in agent briefs / AGENTS (no Stop hooks).
+- Hooks: `pretool-protect-main`, `pretool-protect-worktree-write` (Claude). There is no Stop hook. The implementer brief requires passing tests and a commit before report back. Codex honors the same rules in agent briefs (no Stop hooks).
 - Consumer git hooks (`.relentless/githooks`, via `core.hooksPath` or chained onto husky) refuse commits and pushes to main/master and force-pushes. On Codex without a sandbox those hooks are advisory, since an agent can bypass them with `git push --no-verify` or `git -c core.hooksPath=/dev/null ...`, so branch protection is the only hard lock on `main` there. GitHub branch protection stays off unless setup was explicitly told yes.
 
 ## Conventional commits (PR10)
@@ -183,8 +183,8 @@ Project scripts must not swallow errors with bare `|| true` / redirected-away st
 ## Named roles (PR6)
 `orchestrator` (session driver), `planner`, `implementer`, `reviewer`, `qa`, `documenter` — Claude `agents/*.md` + Codex `.codex/agents/*.toml`.
 
-## Stop / protect hooks
-- `stop-gate.sh`: exit 0 when stdin `stop_hook_active` is true (no loop). Otherwise block end-of-turn with a dirty worktree; failing project tests (`checks.test`, else `npm test` when `package.json` has `scripts.test`; skip when there is no command); `state:in-progress` without pushed branch/PR; open PR without `## QA` section.
+## Protect hooks
+- There is no Stop hook. Before report back, the implementer brief requires passing tests and no uncommitted work (commit a checkpoint; do not stash). QA checks what slips through.
 - `pretool-protect-main.sh`: no commit/push on main (including `git -C` / `cd` onto another checkout); no force-push (`-f`, `--force`, `--force-with-lease`, `+refspec`) / reset --hard / clean -f.
 - `pretool-gh-workflow.sh`: an agent role cannot invoke `decide.sh`, `accept-adr.sh`, or `new-adr.sh --status accepted`.
 - Run `bash tests/hooks/test-hooks.sh`, `tests/hooks/test-decide-guard.sh`, and `tests/hooks/test-githooks.sh`.

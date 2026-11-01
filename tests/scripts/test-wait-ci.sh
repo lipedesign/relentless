@@ -247,6 +247,14 @@ if [[ "$1" == "api" ]]; then
     echo '["review:approved","merge:auto"]'
     exit 0
   fi
+  if [[ "$*" == *"issues/3/comments"* && "$*" != *"--jq"* ]]; then
+    if [[ -n "${GH_VERDICT_JSON:-}" ]]; then
+      printf '%s\n' "$GH_VERDICT_JSON"
+    else
+      jq -n --arg sha "${GH_SHA1:?}" '[{created_at:"2026-01-01T00:00:00Z", body: ("<!-- relentless:review-verdict verdict=\"approved\" sha=\"" + $sha + "\" -->")}]'
+    fi
+    exit 0
+  fi
   if [[ -n "${GH_API_BODY:-}" && -f "$GH_API_BODY" ]]; then
     cat "$GH_API_BODY"
     exit 0

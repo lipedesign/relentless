@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
-# fill-qa-section.sh — post QA as a 🤖 PR comment with <!-- relentless:qa --> (avoids fragile PR-body splice).
-# Also optionally patches the PR body QA section if --patch-body is set.
-# Usage: fill-qa-section.sh --repo OWNER/NAME --pr N --body-file PATH [--patch-body]
+# fill-qa-section.sh — post QA as a 🤖 PR comment with <!-- relentless:qa --> and patch the PR body.
+# Patching the ## QA / dogfood result section is the default. --patch-body is explicit.
+# --no-patch-body posts the comment only.
+# Usage: fill-qa-section.sh --repo OWNER/NAME --pr N --body-file PATH [--patch-body|--no-patch-body]
 set -euo pipefail
-REPO="" PR="" BODY_FILE="" PATCH=0
+REPO="" PR="" BODY_FILE="" PATCH=1
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --repo) REPO="${2:-}"; shift 2 ;;
     --pr) PR="${2:-}"; shift 2 ;;
     --body-file) BODY_FILE="${2:-}"; shift 2 ;;
     --patch-body) PATCH=1; shift ;;
+    --no-patch-body) PATCH=0; shift ;;
     *) shift ;;
   esac
 done

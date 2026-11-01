@@ -91,6 +91,38 @@ run $R feat/1-x "RELENTLESS_ROLE=implementer" 0 'gh pr create --title x --body "
 run $R feat/1-x "$N" 2 'gh pr edit 3 --add-label review:approved && gh pr merge 3'
 run $R feat/1-x "RELENTLESS_ROLE=orchestrator" 0 './core/scripts/merge-if-ready.sh --pr 3'
 
+# Reviewer gh api: one method flag is allowed, including -f/-F on an explicit GET.
+# A second -X/--method, or any --input, is blocked. Other roles are not.
+run $R feat/1-x "RELENTLESS_ROLE=reviewer" 0 'gh api -X GET repos/o/r/issues/1'
+run $R feat/1-x "RELENTLESS_ROLE=reviewer" 0 'gh api --method GET repos/o/r/pulls/1'
+run $R feat/1-x "RELENTLESS_ROLE=reviewer" 0 'gh api -XGET repos/o/r/issues/1'
+run $R feat/1-x "RELENTLESS_ROLE=reviewer" 0 'gh api --method=GET repos/o/r/issues/1'
+run $R feat/1-x "RELENTLESS_ROLE=reviewer" 0 'gh api -X GET repos/o/r/issues/1 -f state=open'
+run $R feat/1-x "RELENTLESS_ROLE=reviewer" 0 'gh api -X GET repos/o/r/issues/1 -F per_page=1'
+run $R feat/1-x "RELENTLESS_ROLE=reviewer" 0 'gh api --method GET repos/o/r/issues/1 -f state=open'
+run $R feat/1-x "RELENTLESS_ROLE=reviewer" 0 'gh api --method GET repos/o/r/issues/1 -F per_page=1'
+run $R feat/1-x "RELENTLESS_ROLE=reviewer" 0 'gh api -X GET foo -f a=1 && gh api --method GET bar -F b=2'
+run $R feat/1-x "RELENTLESS_ROLE=reviewer" 2 'gh api -X GET foo -X POST'
+run $R feat/1-x "RELENTLESS_ROLE=reviewer" 2 'gh api --method GET foo --method POST'
+run $R feat/1-x "RELENTLESS_ROLE=reviewer" 2 'gh api -X GET foo --method POST'
+run $R feat/1-x "RELENTLESS_ROLE=reviewer" 2 'gh api -XGET foo -XPOST'
+run $R feat/1-x "RELENTLESS_ROLE=reviewer" 2 'gh api --method=GET foo --method=POST'
+run $R feat/1-x "RELENTLESS_ROLE=reviewer" 2 'gh api -XPOST foo --method=GET'
+run $R feat/1-x "RELENTLESS_ROLE=reviewer" 2 'gh api -X GET foo --input body.json'
+run $R feat/1-x "RELENTLESS_ROLE=reviewer" 2 'gh api --method GET foo --input body.json'
+run $R feat/1-x "RELENTLESS_ROLE=reviewer" 2 'gh api -X GET foo --input=body.json'
+run $R feat/1-x "RELENTLESS_ROLE=reviewer" 2 'gh api --input=body.json -X GET foo'
+run $R feat/1-x "RELENTLESS_ROLE=reviewer" 2 'gh api -X GET foo && gh api -X GET bar -X POST'
+run $R feat/1-x "CLAUDE_AGENT=reviewer" 2 'gh api -X GET foo -X POST'
+run $R feat/1-x "CLAUDE_AGENT=reviewer" 2 'gh api --method GET foo --input=body.json'
+run $R feat/1-x "RELENTLESS_ROLE=reviewer" 0 'git commit -m "docs: gh api -X GET foo -X POST and --input are not a call"'
+run $R feat/1-x "RELENTLESS_ROLE=implementer" 0 'gh api -X GET foo -X POST'
+run $R feat/1-x "RELENTLESS_ROLE=implementer" 0 'gh api -X GET foo --input body.json'
+run $R feat/1-x "RELENTLESS_ROLE=orchestrator" 0 'gh api --method GET foo --method POST'
+run $R feat/1-x "RELENTLESS_ROLE=orchestrator" 0 'gh api --input=body.json -X GET foo'
+run $R feat/1-x "RELENTLESS_ROLE=qa" 0 'gh api -XGET foo -XPOST'
+run $R feat/1-x "$N" 0 'gh api -X GET foo -X POST --input body.json'
+
 # human decision scripts: agents cannot invoke them; quoting the name in a message is not an invocation
 run $G feat/1-x "RELENTLESS_ROLE=implementer" 2 'core/scripts/decide.sh --repo o/n --issue 1 --option 1'
 run $G feat/1-x "RELENTLESS_ROLE=orchestrator" 2 'core/scripts/accept-adr.sh --file a.md --option 1 --decider Ada'
@@ -100,93 +132,23 @@ run $G feat/1-x "RELENTLESS_ROLE=implementer" 2 'env -u RELENTLESS_ROLE core/scr
 run $G feat/1-x "RELENTLESS_ROLE=implementer" 2 'RELENTLESS_HUMAN=1 RELENTLESS_DECISION_TOKEN=forge core/scripts/decide.sh --repo o/n --issue 1 --option 1'
 run $G feat/1-x "RELENTLESS_ROLE=implementer" 2 'bash hooks/scripts/userprompt-decide.sh'
 run $G feat/1-x "CODEX_THREAD_ROLE=implementer" 2 'core/scripts/decide.sh --repo o/n --issue 1 --option 1'
+# request-decision.sh is not role-locked. Opening a request is reversible; decide.sh stays blocked.
+# Workers are instructed not to run it. The hook still allows every role, including the implementer.
 run $G feat/1-x "RELENTLESS_ROLE=implementer" 0 'core/scripts/request-decision.sh --repo o/n --issue 1 --body-file req.md'
+run $G feat/1-x "RELENTLESS_ROLE=orchestrator" 0 'core/scripts/request-decision.sh --repo o/n --issue 1 --body-file req.md'
+run $G feat/1-x "RELENTLESS_ROLE=qa" 0 'core/scripts/request-decision.sh --repo o/n --issue 1 --body-file req.md'
+run $G feat/1-x "RELENTLESS_ROLE=planner" 0 'core/scripts/request-decision.sh --repo o/n --issue 1 --body-file req.md'
+run $G feat/1-x "RELENTLESS_ROLE=documenter" 0 'core/scripts/request-decision.sh --repo o/n --issue 1 --body-file req.md'
+run $G feat/1-x "RELENTLESS_ROLE=reviewer" 0 'core/scripts/request-decision.sh --repo o/n --issue 1 --body-file req.md'
 run $G feat/1-x "RELENTLESS_ROLE=implementer" 0 'git commit -m "docs: tell the decider to run decide.sh themselves"'
 
-# stop-gate: loop guard, failing tests, passing tests, no command, npm fallback
-S=stop-gate.sh
-sg_init() { # name → directory on main, one empty commit
-  local d="$TMP/sg-$1"
-  git init -q -b main "$d"
-  git -C "$d" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
-  printf '%s' "$d"
-}
-sg_config() { # dir command
-  mkdir -p "$1/.relentless"
-  jq -n --arg t "$2" '{checks:{test:$t}}' > "$1/.relentless/config.json"
-}
-# sg_run dir json expected label [env]
-# Sets SG_ERR to the hook stderr path.
-sg_run() {
-  local dir="$1" json="$2" exp="$3" label="$4" envs="${5:-}"
-  local got
-  SG_ERR="$(mktemp)"
-  got=$(
-    printf '%s' "$json" | env $envs bash "$ROOT/hooks/scripts/$S" >/dev/null 2>"$SG_ERR"
-    echo $?
-  )
-  got="${got//$'\n'/}"
-  if [[ "$got" == "$exp" ]]; then
-    PASS=$((PASS + 1))
-  else
-    FAIL=$((FAIL + 1))
-    printf 'FAIL %-32s expected %s got %s: %s\n' "$S" "$exp" "$got" "$label"
-    sed 's/^/  /' "$SG_ERR"
-  fi
-}
-sg_note() { # 1 = ok
-  local ok="$1" label="$2"
-  if [[ "$ok" -eq 1 ]]; then
-    PASS=$((PASS + 1))
-  else
-    FAIL=$((FAIL + 1))
-    printf 'FAIL %-32s %s\n' "$S" "$label"
-    [[ -n "${SG_ERR:-}" && -f "$SG_ERR" ]] && sed 's/^/  /' "$SG_ERR"
-  fi
-}
-
-# stop_hook_active exits 0 before tests or the dirty-worktree check (no loop)
-D="$(sg_init loop)"
-sg_config "$D" "touch ran-tests"
-echo dirty > "$D/dirty.txt"
-sg_run "$D" "$(jq -n --arg c "$D" '{stop_hook_active:true,cwd:$c}')" 0 "stop_hook_active loop guard" "RELENTLESS_ROLE=implementer"
-sg_note "$([[ ! -e "$D/ran-tests" ]] && echo 1 || echo 0)" "stop_hook_active must not run tests"
-
-# failing checks.test blocks; passing checks.test allows
-D="$(sg_init fail)"
-sg_config "$D" "false"
-sg_run "$D" "$(jq -n --arg c "$D" '{stop_hook_active:false,cwd:$c}')" 2 "failing tests block"
-sg_note "$(grep -q 'project tests failed' "$SG_ERR" && echo 1 || echo 0)" "failing tests stderr reason"
-
-D="$(sg_init pass)"
-sg_config "$D" "true"
-sg_run "$D" "$(jq -n --arg c "$D" '{stop_hook_active:false,cwd:$c}')" 0 "passing tests allow"
-sg_note "$(grep -q 'BLOCKED' "$SG_ERR" && echo 0 || echo 1)" "passing tests must not block"
-
-# no test command (no config, no package.json scripts.test) allows
-D="$(sg_init none)"
-printf '%s\n' '{"name":"sg","private":true,"scripts":{"lint":"true"}}' > "$D/package.json"
-sg_run "$D" "$(jq -n --arg c "$D" '{cwd:$c}')" 0 "no test command allows"
-
-# empty checks.test falls back to npm test when package.json has scripts.test
-D="$(sg_init npm)"
-sg_config "$D" ""
-printf '%s\n' '{"name":"sg","private":true,"scripts":{"test":"exit 1"}}' > "$D/package.json"
-sg_run "$D" "$(jq -n --arg c "$D" '{cwd:$c}')" 2 "npm test fallback blocks"
-sg_note "$(grep -q 'npm test' "$SG_ERR" && echo 1 || echo 0)" "npm test fallback names the command"
-
-# timeout caps a hung suite
-D="$(sg_init slow)"
-sg_config "$D" "sleep 30"
-sg_run "$D" "$(jq -n --arg c "$D" '{cwd:$c}')" 2 "test timeout blocks" "RELENTLESS_STOP_GATE_TEST_TIMEOUT=1"
-sg_note "$(grep -q 'timed out after 1s' "$SG_ERR" && echo 1 || echo 0)" "timeout stderr reason"
-
-# existing dirty-worktree check still runs before tests
-D="$(sg_init dirty)"
-sg_config "$D" "touch ran-tests"
-echo dirty > "$D/dirty.txt"
-sg_run "$D" "$(jq -n --arg c "$D" '{cwd:$c}')" 2 "dirty worktree still blocks" "RELENTLESS_ROLE=implementer"
-sg_note "$(grep -q 'uncommitted changes' "$SG_ERR" && [[ ! -e "$D/ran-tests" ]] && echo 1 || echo 0)" "dirty check still precedes tests"
+# The Stop hook is gone. hooks.json must not register it.
+if grep -q 'stop-gate' "$ROOT/hooks/hooks.json" || [[ -e "$ROOT/hooks/scripts/stop-gate.sh" ]]; then
+  FAIL=$((FAIL + 1))
+  printf 'FAIL stop-gate still registered\n'
+else
+  PASS=$((PASS + 1))
+fi
 
 # Reviewer launch exports the env names the isolation hooks read, before Claude is spawned.
 review="$ROOT/core/scripts/run-isolated-review.sh"

@@ -42,6 +42,92 @@ strip_heredocs() {
 
 CMD_SCAN="$(printf '%s\n' "$CMD" | strip_heredocs)"
 
+# Drop quoted regions so a message that only mentions gh api is not an invocation.
+strip_quoted_regions() {
+  local s="$1"
+  local i=0 len=${#s} quote="" out="" c
+  while [[ $i -lt $len ]]; do
+    c="${s:i:1}"
+    if [[ -n "$quote" ]]; then
+      if [[ "$c" == "$quote" ]]; then quote=""; fi
+      i=$((i + 1))
+      continue
+    fi
+    if [[ "$c" == "'" || "$c" == '"' ]]; then
+      quote="$c"
+      i=$((i + 1))
+      continue
+    fi
+    out+="$c"
+    i=$((i + 1))
+  done
+  printf '%s' "$out"
+}
+
+# 0 when this gh api argv has more than one method flag or any --input.
+# -X / --method count once each, including -XPOST and --method=POST.
+# One explicit GET plus -f/-F is not denied here.
+gh_api_args_denied() {
+  local method=0 token next
+  while [[ $# -gt 0 ]]; do
+    token="$1"
+    shift
+    [[ "$token" == "--" ]] && break
+    if [[ "$token" == "--input" || "$token" == --input=* ]]; then
+      return 0
+    fi
+    if [[ "$token" == "-X" || "$token" == "--method" ]]; then
+      method=$((method + 1))
+      if [[ $# -gt 0 ]]; then
+        next="$1"
+        if [[ "$next" != -* ]]; then
+          shift
+        fi
+      fi
+      continue
+    fi
+    if [[ "$token" == -X?* || "$token" == --method=* ]]; then
+      method=$((method + 1))
+      continue
+    fi
+  done
+  [[ "$method" -gt 1 ]]
+}
+
+# 0 when any gh api invocation in the command is denied.
+reviewer_gh_api_unsafe() {
+  local scan line base i j n
+  local -a words args
+  scan="$(strip_quoted_regions "$CMD_SCAN")"
+  scan="${scan//||/$'\n'}"
+  scan="${scan//&&/$'\n'}"
+  scan="${scan//;/$'\n'}"
+  scan="${scan//|/$'\n'}"
+  scan="${scan//&/$'\n'}"
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    words=()
+    read -r -a words <<< "$line" || true  # intentional: empty segment
+    n=${#words[@]}
+    i=0
+    while [[ $i -lt $n ]]; do
+      base="${words[$i]##*/}"
+      if [[ "$base" == "gh" && $((i + 1)) -lt $n && "${words[$((i + 1))]}" == "api" ]]; then
+        args=()
+        j=$((i + 2))
+        while [[ $j -lt $n ]]; do
+          args+=("${words[$j]}")
+          j=$((j + 1))
+        done
+        if [[ ${#args[@]} -gt 0 ]] && gh_api_args_denied "${args[@]}"; then
+          return 0
+        fi
+      fi
+      i=$((i + 1))
+    done
+  done <<< "$scan"
+  return 1
+}
+
 ROLE="${RELENTLESS_ROLE:-${CODEX_THREAD_ROLE:-}}"
 AGENT="${CLAUDE_AGENT:-${AGENT_NAME:-}}"
 
@@ -75,6 +161,18 @@ if [[ "$is_implementer" -eq 1 ]]; then
     fi
   fi
   exit 0
+fi
+
+# Reviewer only. The gh allowlist star matches the rest of the command, so a
+# second method flag or --input still looks like an allowed GET. Deny those here.
+# One -X/--method, including with -f/-F, stays allowed. Other roles are unchanged.
+is_reviewer=0
+if [[ "$ROLE" == "reviewer" || "$AGENT" == "reviewer" || "$AGENT" == *":reviewer" ]]; then
+  is_reviewer=1
+fi
+if [[ "$is_reviewer" -eq 1 ]] && reviewer_gh_api_unsafe; then
+  echo "[relentless] BLOCKED: reviewer gh api may use one -X/--method and must not pass --input." >&2
+  exit 2
 fi
 
 # Non-implementer heuristic: applying review:approved AND pushing/merging in one bash

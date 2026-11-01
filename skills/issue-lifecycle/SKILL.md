@@ -1,11 +1,11 @@
 ---
 name: issue-lifecycle
-description: Move issues through exactly one state:* label; create milestones, epics, and sub-issues; assignees. Use set-state / create-milestone / create-epic / create-issue / add-sub-issue.
+description: Move issues through exactly one state:* label; create milestones, epics, and sub-issues; assignees. The orchestrator runs set-state. Planner uses create-milestone / create-epic / create-issue / add-sub-issue.
 ---
 
 # Issue lifecycle
 
-Always **swap** state labels via `core/scripts/set-state.sh` (quiet by default; `--verbose` for URLs).
+Only the orchestrator runs `core/scripts/set-state.sh` and moves `state:*` labels (quiet by default; `--verbose` for URLs). The implementer, qa, documenter, and planner do not write state labels or run `set-state.sh`.
 
 ## Open a wave (planner)
 ```bash
@@ -21,7 +21,10 @@ core/scripts/create-issue.sh --repo OWNER/NAME --title "feat: …" \
 ```
 
 `--label` APPENDS to `state:todo`. `--type` sets bug|enhancement|documentation|investigation|epic.
+Creating an issue with the default `state:todo` is the initial label, not a state transition.
 Work too big for one session/PR → epic + sub-issues (`decompose-epic` skill). No complexity labels.
+
+## State transitions (orchestrator)
 
 ```bash
 core/scripts/set-state.sh --repo OWNER/NAME --issue N --state in-progress
@@ -29,8 +32,8 @@ core/scripts/close-epic.sh --repo OWNER/NAME --epic N
 ```
 
 State machine:
-- todo → in-progress → review (implementer **stops here**)
+- todo → in-progress → review (implementer **stops here**; the orchestrator sets the label)
 - review + isolated approve → merge-if-ready → done
 - review + changes_requested → **in-progress**
 
-Assignees: worker in progress; decider on `human:pending`; after `/decide` back to worker.
+Assignees: worker while in progress; decider on `human:pending`; after the decider runs `/decide`, back to the worker. The orchestrator assigns.
