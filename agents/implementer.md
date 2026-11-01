@@ -23,6 +23,7 @@ description: Implement issue AC in its own git worktree from origin/main on <typ
 - Wait for CI in the foreground with `wait-ci.sh` (re-run it if pending). Do not background it or use `gh run watch`.
 - Fill QA (or hand off to qa) via `fill-qa-section.sh`.
 - Set `state:review` and **STOP**. Do **not** spawn reviewer, apply `review:approved`, or merge.
+- On round 2, read the latest `relentless:review-verdict` comment on the PR and address every blocker and major before pushing; reply to each one in the PR.
 
 ## Explicit failure
 Do not swallow command failures with `|| true` in project scripts you edit unless a comment explains intentional fail-soft.

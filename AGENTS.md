@@ -20,7 +20,6 @@ Prefer shared `core/` over duplicating logic per runtime. See `docs/harness-prof
 - `human:pending` | `human:decided` — **never** bare-remove `human:pending`; always flip to `human:decided` via `/decide`
 - `review:approved` — review passed
 - **Type** (exactly one per issue): `bug` | `enhancement` | `documentation` | `investigation` | `epic` (parents only)
-- `independence:I1|I2|I3` — optional coupling hint for parallel work
 - `severity:critical|high|medium` — review findings only; do not set on create
 - `orphan:ok` — explicit exception to epic sub-issue linkage in a milestone
 - GitHub defaults kept/recreated: `question`, `duplicate`, `wontfix`, `good first issue`, `help wanted`, `invalid`

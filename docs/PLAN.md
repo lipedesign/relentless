@@ -189,7 +189,7 @@ Addressed in tree after Teste-relentless dogfood:
 
 ## 10. Epic + label taxonomy (2026-10-31)
 
-Shipped: expanded labels (type / epic / investigation / independence / severity / GitHub defaults; **no** complexity), `create-epic` / `add-sub-issue` / `create-issue --parent` / `close-epic`, `decompose-epic` skill, milestone guards (epic parent + sub-issue linkage), lohra-ts issue form (Proof → QA/dogfood), apollo-style milestone + epic understanding, investigation template.
+Shipped: expanded labels (type / epic / investigation / severity / GitHub defaults; **no** complexity), `create-epic` / `add-sub-issue` / `create-issue --parent` / `close-epic`, `decompose-epic` skill, milestone guards (epic parent + sub-issue linkage), lohra-ts issue form (Proof → QA/dogfood), apollo-style milestone + epic understanding, investigation template.
 
 ## 11. Repo setup / stack CI (2026-10-31) — v1.4.0
 
@@ -225,3 +225,12 @@ Shipped against §1 inventory:
 - `tests/hooks/` regression harness; CI runs it.
 - Setup installs consumer `pre-commit` / `pre-push` via `core.hooksPath` (chains husky, does not clobber). GitHub branch protection stays opt-in.
 - Human decisions: agents cannot run `decide.sh` / `accept-adr.sh`; Claude UserPromptSubmit records a typed `/decide`; Codex refuses without a TTY and tells the decider the exact terminal command. `merge-if-ready` refuses an accepted ADR with no decision-request comment.
+
+## 15. Future evolution — native issue dependencies
+
+Plan only. Not implemented in this release.
+
+- Native GitHub issue dependencies (blocked-by).
+- A `next-ready` script that lists issues whose blockers are all closed.
+
+Until that ships, dependencies stay in prose (`## Dependencies` / `Blocked by:` in issues). That convention is what dogfood used.
