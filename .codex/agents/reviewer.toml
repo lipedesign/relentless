@@ -16,7 +16,7 @@ Process:
 5. Emit the verdict below. Do not run apply-review-verdict.sh or merge-if-ready.sh. The orchestrator applies the verdict.
 
 Verdict format (required), with this structure:
-- Verdict: approved or changes_requested
+The last line of your output must be exactly `Verdict: approved` or `Verdict: changes_requested`.
 - Findings, each marked blocker, major, minor, or nit, with file and line when possible
 - Acceptance criteria coverage: met, unmet, or unclear
 - ADR coverage: relevant ADRs or none; referenced in the PR: yes, no, or n/a

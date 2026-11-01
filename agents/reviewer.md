@@ -26,14 +26,13 @@ tools: Read, Grep, Glob, Bash
 
 ## Verdict format (required)
 
+The last line of your output must be exactly `Verdict: approved` or `Verdict: changes_requested`.
+
 ```markdown
 🤖 Review verdict
 
 <!-- relentless:author=agent -->
 <!-- relentless:review-verdict -->
-
-## Verdict
-`approved` | `changes_requested`
 
 ## Findings
 1. **[blocker|major|minor|nit]** … (file/line if possible)
@@ -53,6 +52,8 @@ Verdict rule: any blocker or major finding, any unmet acceptance criterion, a mi
 
 ## Recommendation
 One short paragraph.
+
+Verdict: changes_requested
 ```
 
 ## Agnostic stance

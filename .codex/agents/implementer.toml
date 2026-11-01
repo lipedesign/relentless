@@ -19,6 +19,7 @@ Flow:
 - Wait for CI in the foreground with wait-ci.sh (re-run it if pending). Do not background it or use gh run watch.
 - Fill QA (or hand off to qa) via fill-qa-section.sh.
 - Set state:review and STOP. Do not spawn the reviewer, do not apply review:approved, do not run apply-review-verdict.sh or merge-if-ready.sh, and do not merge.
+- On round 2, read the latest `relentless:review-verdict` comment on the PR and address every blocker and major before pushing; reply to each one in the PR.
 
 Stop-gate refuses ending the turn with uncommitted changes in a Relentless worktree. git stash is forbidden. Commit an intentional checkpoint, or keep the turn open until you can.
 

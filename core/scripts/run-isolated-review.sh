@@ -7,13 +7,14 @@
 #
 # Usage:
 #   run-isolated-review.sh --repo OWNER/NAME --pr N --issue N \
-#     [--harness claude|codex] [--workdir PATH] [--out-dir PATH] [--merge] [--dry-run]
+#     [--harness claude|codex] [--workdir PATH] [--out-dir PATH] \
+#     [--from-output PATH] [--merge] [--dry-run]
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/common.sh
 source "${SCRIPT_DIR}/lib/common.sh"
 
-REPO="" PR="" ISSUE="" HARNESS="" WORKDIR="." OUT_DIR="" MERGE=0 DRY=0
+REPO="" PR="" ISSUE="" HARNESS="" WORKDIR="." OUT_DIR="" FROM_OUTPUT="" MERGE=0 DRY=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --repo) REPO="${2:-}"; shift 2 ;;
@@ -22,15 +23,75 @@ while [[ $# -gt 0 ]]; do
     --harness) HARNESS="${2:-}"; shift 2 ;;
     --workdir) WORKDIR="${2:-}"; shift 2 ;;
     --out-dir) OUT_DIR="${2:-}"; shift 2 ;;
+    --from-output) FROM_OUTPUT="${2:-}"; shift 2 ;;
     --merge) MERGE=1; shift ;;
     --dry-run) DRY=1; shift ;;
     -h|--help)
-      sed -n '2,12p' "$0" | tr -d '#'
+      sed -n '2,11p' "$0" | tr -d '#'
       exit 0 ;;
     *) echo "Unknown: $1" >&2; exit 2 ;;
   esac
 done
 [[ -n "$REPO" && -n "$PR" && -n "$ISSUE" ]] || { echo "need --repo --pr --issue" >&2; exit 2; }
+
+# Last non-empty line must be exactly one of the two verdict forms.
+# A quoted rule earlier in the review must not decide the verdict.
+read_verdict_line() {
+  local file="$1" line="" last=""
+  if [[ ! -f "$file" ]]; then
+    echo "error: missing verdict line (no reviewer output at ${file}). No labels changed." >&2
+    return 1
+  fi
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%$'\r'}"
+    if [[ -n "$line" ]]; then
+      last="$line"
+    fi
+  done <"$file"
+  case "$last" in
+    "Verdict: approved"|"Verdict: changes_requested")
+      printf '%s\n' "${last#Verdict: }"
+      return 0
+      ;;
+    "")
+      echo "error: missing verdict line in ${file}. The last non-empty line must be exactly 'Verdict: approved' or 'Verdict: changes_requested'. No labels changed." >&2
+      return 1
+      ;;
+    *)
+      echo "error: malformed verdict line in ${file}: [${last}]" >&2
+      echo "error: the last non-empty line must be exactly 'Verdict: approved' or 'Verdict: changes_requested'. No labels changed." >&2
+      return 1
+      ;;
+  esac
+}
+
+apply_parsed_verdict() {
+  local verdict="$1"
+  echo "$verdict" >"$VERDICT_FILE"
+  echo "verdict: $verdict"
+  "${SCRIPT_DIR}/apply-review-verdict.sh" --repo "$REPO" --issue "$ISSUE" --pr "$PR" \
+    --verdict "$verdict" --review-out "$VERDICT_RAW" --workdir "$WORKDIR"
+  if [[ "$verdict" == "approved" && "$MERGE" -eq 1 ]]; then
+    "${SCRIPT_DIR}/merge-if-ready.sh" --repo "$REPO" --pr "$PR" --issue "$ISSUE"
+  fi
+  echo "== isolated review done (verdict=$verdict) =="
+}
+
+OUT_DIR="${OUT_DIR:-${WORKDIR}/.relentless/review/${PR}}"
+mkdir -p "$OUT_DIR"
+BUNDLE="${OUT_DIR}/review-bundle.md"
+VERDICT_RAW="${OUT_DIR}/reviewer-out.md"
+VERDICT_FILE="${OUT_DIR}/verdict.txt"
+
+if [[ -n "$FROM_OUTPUT" ]]; then
+  [[ -f "$FROM_OUTPUT" ]] || { echo "error: --from-output file not found: $FROM_OUTPUT" >&2; exit 1; }
+  cp "$FROM_OUTPUT" "$VERDICT_RAW"
+  if ! verdict="$(read_verdict_line "$VERDICT_RAW")"; then
+    exit 1
+  fi
+  apply_parsed_verdict "$verdict"
+  exit 0
+fi
 
 # Infer harness from config or PATH
 if [[ -z "$HARNESS" ]]; then
@@ -47,12 +108,6 @@ if [[ -z "$HARNESS" || "$HARNESS" == "both" ]]; then
   fi
 fi
 
-OUT_DIR="${OUT_DIR:-${WORKDIR}/.relentless/review/${PR}}"
-mkdir -p "$OUT_DIR"
-BUNDLE="${OUT_DIR}/review-bundle.md"
-VERDICT_RAW="${OUT_DIR}/reviewer-out.md"
-VERDICT_FILE="${OUT_DIR}/verdict.txt"
-
 echo "== isolated review (harness=$HARNESS) PR #$PR issue #$ISSUE =="
 echo "foreground: reviewer runs in this process until it exits; do not background it"
 
@@ -61,7 +116,8 @@ echo "bundle: $BUNDLE ($(wc -c <"$BUNDLE") bytes)"
 
 PROMPT_FILE="${OUT_DIR}/reviewer-prompt.md"
 {
-  echo "You are the Relentless isolated reviewer. Read-only. Emit the structured verdict only."
+  echo "You are the Relentless isolated reviewer. Read-only."
+  echo "The last line of your output must be exactly \`Verdict: approved\` or \`Verdict: changes_requested\`."
   echo "Do not edit files, push, or merge. Prefer not re-running full CI."
   echo ""
   cat "$BUNDLE"
@@ -118,37 +174,9 @@ case "$HARNESS" in
     echo "error: unknown harness $HARNESS" >&2; exit 2 ;;
 esac
 
-# Parse verdict
-VERDICT=""
-if grep -qiE '^\s*`?approved`?\s*$|## Verdict[[:space:]]*$' "$VERDICT_RAW" 2>/dev/null; then
-  if grep -qiE '`approved`|^approved$|Verdict.*approved' "$VERDICT_RAW"; then
-    if grep -qiE '`changes_requested`|changes_requested' "$VERDICT_RAW" && \
-       ! grep -qiE '`approved`' "$VERDICT_RAW"; then
-      VERDICT="changes_requested"
-    else
-      # Prefer last explicit verdict token
-      if grep -qoE '`?(approved|changes_requested)`?' "$VERDICT_RAW"; then
-        VERDICT="$(grep -oE '`?(approved|changes_requested)`?' "$VERDICT_RAW" | tr -d '`' | tail -1)"
-      fi
-    fi
-  fi
-fi
-if [[ -z "$VERDICT" ]]; then
-  VERDICT="$(grep -oE '`?(approved|changes_requested)`?' "$VERDICT_RAW" 2>/dev/null | tr -d '`' | tail -1 || true)"  # intentional fail-soft
-fi
-if [[ -z "$VERDICT" ]]; then
-  echo "error: could not parse verdict from $VERDICT_RAW" >&2
+if ! VERDICT="$(read_verdict_line "$VERDICT_RAW")"; then
   echo "---- reviewer output (tail) ----" >&2
-  tail -40 "$VERDICT_RAW" >&2 || true  # intentional fail-soft
+  tail -40 "$VERDICT_RAW" >&2 || true  # intentional fail-soft: show context after a parse failure
   exit 1
 fi
-echo "$VERDICT" > "$VERDICT_FILE"
-echo "verdict: $VERDICT"
-
-"${SCRIPT_DIR}/apply-review-verdict.sh" --repo "$REPO" --issue "$ISSUE" --pr "$PR" --verdict "$VERDICT"
-
-if [[ "$VERDICT" == "approved" && "$MERGE" -eq 1 ]]; then
-  "${SCRIPT_DIR}/merge-if-ready.sh" --repo "$REPO" --pr "$PR" --issue "$ISSUE"
-fi
-
-echo "== isolated review done (verdict=$VERDICT) =="
+apply_parsed_verdict "$VERDICT"
