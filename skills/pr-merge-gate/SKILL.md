@@ -21,6 +21,7 @@ After the **isolated** reviewer returns and you run `apply-review-verdict.sh`:
 ## merge-if-ready behavior
 - Mode: issue `merge:auto` / `merge:human`, else `.relentless/config.json` → `merge.default`.
 - Requires `review:approved` and CI green on the PR **head SHA**.
+- The latest `relentless:review-verdict` comment must record that full `headRefOid`. No SHA refuses the merge. A different SHA removes `review:approved` and refuses.
 - **auto:** retarget open PRs whose base is the head branch onto the PR base (usually `main`) → `gh pr merge --merge` → delete branch only if no dependents remain → `state:done`, close issue, 🤖 merged comment.
 - **human:** post 🤖 ready-to-merge comment and **wait** (do not merge).
 

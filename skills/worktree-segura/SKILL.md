@@ -1,6 +1,6 @@
 ---
 name: worktree-segura
-description: One implementer per git worktree from fresh origin/main on branch <type>/<n>-<slug>. Use at the start of every implementation and whenever a Stop or write hook complains.
+description: One implementer per git worktree from fresh origin/main on branch <type>/<n>-<slug>. Use at the start of every implementation and whenever a write hook complains.
 ---
 
 # Safe worktree (worktree-segura)
@@ -37,8 +37,8 @@ Optional: `--parent DIR`, `--path DIR`, `--base main`, `--dry-run`, `--no-push`.
 - Round 2+ (same issue after review): stay in **the same** worktree; pull/merge `origin/<branch>` if needed; never force-push.
 - Conflict with main on a published branch: `git fetch origin && git merge origin/main` (rebase of published branches is blocked by protect-main).
 
-## D. Stop / end of turn
-Stop-gate refuses ending the turn with uncommitted changes in a Relentless worktree. git stash is forbidden. Commit an intentional checkpoint, or keep the turn open until you can.
+## D. Before report back
+Commit an intentional checkpoint before reporting back. git stash is forbidden. Passing tests and a clean worktree are part of that report; a failing test is a blocker, not a finished turn.
 
 ## E. After merge
 Orchestrator / merge-if-ready cleans up:

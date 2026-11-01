@@ -63,6 +63,15 @@ if [[ "$1" == "api" ]]; then
           num="${BASH_REMATCH[1]}"
         fi
       done
+      # merge-if-ready reads PR issue comments as JSON and parses the verdict locally.
+      if [[ "$num" == "3" && "$*" != *"--jq"* ]]; then
+        if [[ -n "${GH_VERDICT_JSON:-}" ]]; then
+          printf '%s\n' "$GH_VERDICT_JSON"
+        else
+          printf '%s\n' '[{"created_at":"2026-01-01T00:00:00Z","body":"<!-- relentless:review-verdict verdict=\"approved\" sha=\"abc123\" -->"}]'
+        fi
+        exit 0
+      fi
       if [[ -n "${GH_COMMENT_DIR:-}" && -n "$num" && -f "${GH_COMMENT_DIR}/${num}" ]]; then
         cat "${GH_COMMENT_DIR}/${num}"
       elif [[ "$num" == "9" ]]; then

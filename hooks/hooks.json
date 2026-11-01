@@ -48,19 +48,6 @@
           }
         ]
       }
-    ],
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-.}}/hooks/scripts/stop-gate.sh\"",
-            "timeout": 150,
-            "statusMessage": "relentless stop-gate"
-          }
-        ]
-      }
     ]
   }
 }

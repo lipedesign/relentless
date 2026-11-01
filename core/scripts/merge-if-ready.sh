@@ -2,6 +2,8 @@
 # merge-if-ready.sh — orchestrator final step after isolated review.
 # Resolves merge mode (issue merge:* else config merge.default).
 # auto: require CI green on head SHA + review:approved → merge commit, state:done, close issue.
+# The latest relentless:review-verdict comment must record that same full headRefOid.
+# No SHA refuses the merge (older approvals are not kept). A different SHA drops review:approved.
 # human: post 🤖 ready-to-merge and exit 0 without merging.
 #
 # Before either of those, refuses (exit 1, no merge) unless the PR
@@ -267,6 +269,53 @@ check_accepted_adr_decision_requests() {
   post_adr_decision_blocked "${accepted[@]}"
 }
 
+# Latest review-verdict comment only. Compare its sha attribute to the full headRefOid.
+# Missing SHA refuses and leaves the label. A different value removes review:approved.
+check_reviewed_head_sha() {
+  local json="" rc=0 verdict_body="" sha="" sha_re=""
+  set +e
+  # intentional: stderr is replaced by the refusal below when comments cannot be read
+  json="$(gh api --paginate "repos/${REPO}/issues/${PR}/comments" 2>/dev/null)"
+  rc=$?
+  set -e
+  if [[ $rc -ne 0 || -z "$json" ]]; then
+    echo "error: could not read review verdict comments on PR #${PR}. Refusing merge. Run a fresh review." >&2
+    exit 1
+  fi
+  set +e
+  # intentional: a comments payload that is not a JSON array is a refused merge below
+  verdict_body="$(printf '%s' "$json" | jq -r '[.[] | select((.body // "") | contains("relentless:review-verdict"))] | sort_by(.created_at // "") | last | .body // empty' 2>/dev/null)"
+  rc=$?
+  set -e
+  if [[ $rc -ne 0 ]]; then
+    echo "error: could not read review verdict comments on PR #${PR}. Refusing merge. Run a fresh review." >&2
+    exit 1
+  fi
+  if [[ -z "$verdict_body" ]]; then
+    echo "error: PR #${PR} has no review verdict comment with a reviewed SHA. Refusing merge. Run a fresh review." >&2
+    exit 1
+  fi
+  sha=""
+  # Stored in a variable so the angle bracket is part of the regex, not a redirect.
+  sha_re='relentless:review-verdict[^>]*sha="([0-9a-fA-F]+)"'
+  if [[ "$verdict_body" =~ $sha_re ]]; then
+    sha="${BASH_REMATCH[1]}"
+  fi
+  if [[ -z "$sha" ]]; then
+    echo "error: latest review verdict on PR #${PR} has no reviewed SHA. Refusing merge. Run a fresh review." >&2
+    exit 1
+  fi
+  if [[ "$sha" != "$HEAD_SHA" ]]; then
+    if ! gh api -X DELETE "repos/${REPO}/issues/${ISSUE}/labels/review%3Aapproved" >/dev/null; then
+      echo "error: PR #${PR} head ${HEAD_SHA} does not match reviewed SHA ${sha}. Could not remove review:approved. Refusing merge." >&2
+      exit 1
+    fi
+    echo "error: PR #${PR} head ${HEAD_SHA} does not match reviewed SHA ${sha}. Removed review:approved. Refusing merge." >&2
+    exit 1
+  fi
+}
+
+check_reviewed_head_sha
 check_pr_adrs_line
 check_accepted_adr_decision_requests
 
@@ -286,7 +335,7 @@ config_check_cmd() {
 }
 
 # checks.test when set; else npm test when the worktree package.json has scripts.test.
-# Same resolution as hooks/scripts/stop-gate.sh, rooted at the PR head checkout.
+# Rooted at the PR head checkout. Used when Actions quota skips CI.
 resolve_local_test_command() {
   local root="$1" cmd="" pkg=""
   cmd="$(config_check_cmd test)"

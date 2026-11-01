@@ -35,39 +35,55 @@ collect_findings() {
   grep -i -E '\[(blocker|major|minor|nit)\]' "$file" || true  # intentional fail-soft: no tagged findings
 }
 
+# Full headRefOid of the PR that was reviewed. Merge compares this exact value.
+HEAD_SHA=""
+if [[ -n "$PR" ]]; then
+  set +e
+  # intentional: stderr is replaced by the refusal below when the head SHA cannot be read
+  HEAD_SHA="$(gh pr view "$PR" --repo "$REPO" --json headRefOid -q .headRefOid 2>/dev/null)"
+  rc=$?
+  set -e
+  HEAD_SHA="${HEAD_SHA//$'\r'/}"
+  HEAD_SHA="${HEAD_SHA//$'\n'/}"
+  if [[ $rc -ne 0 || ! "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "error: could not read the full head SHA for PR #${PR}; not recording a review verdict" >&2
+    exit 1
+  fi
+fi
+
+post_verdict_comment() {
+  local title="$1" with_findings="${2:-0}" findings="" body_file=""
+  [[ -n "$PR" ]] || return 0
+  if [[ "$with_findings" -eq 1 ]]; then
+    findings="$(collect_findings "$REVIEW_OUT")"
+  fi
+  body_file="$(mktemp)"
+  {
+    echo "$title"
+    echo
+    echo "<!-- relentless:author=agent -->"
+    echo "<!-- relentless:review-verdict verdict=\"${VERDICT}\" sha=\"${HEAD_SHA}\" -->"
+    if [[ -n "$findings" ]]; then
+      echo
+      echo "## Findings"
+      printf '%s\n' "$findings"
+    fi
+  } >"$body_file"
+  gh pr comment "$PR" --repo "$REPO" --body-file "$body_file" || true  # intentional fail-soft: labels already applied; comment is best-effort
+  rm -f "$body_file"
+}
+
 case "$VERDICT" in
   approved)
     gh api -X POST "repos/${REPO}/issues/${ISSUE}/labels" -f "labels[]=review:approved" >/dev/null || true  # intentional fail-soft
     set_issue_state "$REPO" "$ISSUE" "state:review" 1
-    if [[ -n "$PR" ]]; then
-      gh pr comment "$PR" --repo "$REPO" --body "🤖 review:approved
-
-<!-- relentless:author=agent -->
-<!-- relentless:review-verdict verdict=\"approved\" -->
-" || true  # intentional fail-soft
-    fi
+    post_verdict_comment "🤖 review:approved" 0
     echo "ok approved → review:approved + state:review (next: merge-if-ready.sh)"
     ;;
   changes_requested)
     gh api -X DELETE "repos/${REPO}/issues/${ISSUE}/labels/review%3Aapproved" 2>/dev/null || true  # intentional fail-soft
     set_issue_state "$REPO" "$ISSUE" "state:in-progress" 1
-    if [[ -n "$PR" ]]; then
-      findings="$(collect_findings "$REVIEW_OUT")"
-      body_file="$(mktemp)"
-      {
-        echo "🤖 changes_requested — back to state:in-progress"
-        echo
-        echo "<!-- relentless:author=agent -->"
-        echo "<!-- relentless:review-verdict -->"
-        if [[ -n "$findings" ]]; then
-          echo
-          echo "## Findings"
-          printf '%s\n' "$findings"
-        fi
-      } >"$body_file"
-      gh pr comment "$PR" --repo "$REPO" --body-file "$body_file" || true  # intentional fail-soft: labels already applied; comment is best-effort
-      rm -f "$body_file"
-    fi
+    post_verdict_comment "🤖 changes_requested — back to state:in-progress" 1
     echo "ok changes_requested → state:in-progress"
     ;;
   *) echo "verdict must be approved|changes_requested" >&2; exit 2 ;;

@@ -13,6 +13,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 ROLES = ("orchestrator", "planner", "implementer", "reviewer", "qa", "documenter")
+WORKERS = ("planner", "implementer", "reviewer", "qa", "documenter")
+MAX_DO_NOT = 6
 
 # Codex adaptations that are not always spelled out in the Claude brief,
 # because Claude enforces them with hooks. They must still be in the TOML.
@@ -232,6 +234,55 @@ SENTENCE_PARITY = {
 IMPLEMENTER_MUST_NOT = "If merge-if-ready exits non-zero, never post its messages, apply merge labels or merge yourself. Quote its output on the issue, label it `human:pending` with the reason, and stop."
 
 
+def normalize_emphasis(text: str) -> str:
+    """TOML briefs drop backticks and bold. Nothing else may change."""
+    return text.replace("`", "").replace("**", "").strip()
+
+
+def markdown_do_not(md: str) -> list[str]:
+    _, body = strip_frontmatter(md)
+    items: list[str] = []
+    in_section = False
+    for raw in body.splitlines():
+        if raw.startswith("## "):
+            if in_section:
+                break
+            if raw.strip() == "## Do NOT":
+                in_section = True
+            continue
+        if in_section and raw.startswith("- "):
+            items.append(raw.strip())
+    return items
+
+
+def toml_do_not(instructions: str) -> list[str]:
+    items: list[str] = []
+    in_section = False
+    for raw in instructions.splitlines():
+        if not in_section:
+            if raw.strip() == "Do NOT:":
+                in_section = True
+            continue
+        if raw.startswith("- "):
+            items.append(raw.strip())
+            continue
+        if raw.strip() == "":
+            continue
+        break
+    return items
+
+
+def frontmatter_tools(md: str) -> str:
+    front, _ = strip_frontmatter(md)
+    match = re.search(r"(?m)^tools:\s*(.+)$", front)
+    return match.group(1).strip() if match else ""
+
+
+def reviewer_allowed_tools(script: str) -> str:
+    match = re.search(r'(?m)^REVIEWER_ALLOWED_TOOLS="([^"]*)"', script)
+    return match.group(1) if match else ""
+
+
 def developer_instructions(toml_text: str) -> str:
     match = re.search(
         r'developer_instructions\s*=\s*"""(.*?)"""',
@@ -278,6 +329,27 @@ def main() -> int:
             failures.append("implementer: orchestrator merge-if-ready sentence leaked into the markdown brief")
         if role == "implementer" and IMPLEMENTER_MUST_NOT in instructions:
             failures.append("implementer: orchestrator merge-if-ready sentence leaked into the TOML")
+        if role in WORKERS:
+            md_items = [normalize_emphasis(item) for item in markdown_do_not(md_text)]
+            toml_items = [normalize_emphasis(item) for item in toml_do_not(instructions)]
+            if not md_items:
+                failures.append(f"{role}: markdown brief missing ## Do NOT items")
+            elif len(md_items) > MAX_DO_NOT:
+                failures.append(f"{role}: ## Do NOT has {len(md_items)} items; at most {MAX_DO_NOT}")
+            elif md_items != toml_items:
+                failures.append(f"{role}: Do NOT items differ after stripping backticks and bold")
+                failures.append(f"  md={md_items}")
+                failures.append(f"  toml={toml_items}")
+        if role == "reviewer":
+            script = (ROOT / "core/scripts/run-isolated-review.sh").read_text()
+            allowed = reviewer_allowed_tools(script)
+            tools = frontmatter_tools(md_text)
+            if not allowed:
+                failures.append("reviewer: REVIEWER_ALLOWED_TOOLS missing from run-isolated-review.sh")
+            elif tools != allowed:
+                failures.append(
+                    f"reviewer: tools frontmatter {tools!r} != REVIEWER_ALLOWED_TOOLS {allowed!r}"
+                )
         for line in normative_lines(md_text):
             missing = [token for token in keywords(line) if token not in lowered and token not in normalized]
             # A paraphrase may drop a function word. Require the concrete tokens

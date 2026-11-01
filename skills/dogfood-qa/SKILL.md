@@ -6,7 +6,7 @@ description: QA agent dogfooding — exercise the workflow and fill QA / dogfood
 # Dogfood QA
 
 1. Exercise bootstrap → issue → (optional human-gate) → implement → review path.
-2. Fill **QA / dogfood result** via `core/scripts/fill-qa-section.sh --repo … --pr N --body-file qa.md` (and/or PR body section).
+2. Write the **QA / dogfood result** markdown. The orchestrator posts it with `core/scripts/fill-qa-section.sh` (the PR body is patched by default). The qa agent does not run that script or `set-state.sh`.
 3. Before milestone close: README accuracy vs shipped pages/features.
 4. File gaps as outcome-tied issues.
 
