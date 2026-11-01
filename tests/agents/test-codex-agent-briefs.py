@@ -69,7 +69,6 @@ CODEX_REQUIRED = {
         "docs/decisions",
         "adrs:",
         "stash",
-        "stop-gate",
         "uncommitted",
     ],
     "reviewer": [
@@ -221,7 +220,7 @@ def keywords(line: str) -> list[str]:
 # place of the sentence.
 SENTENCE_PARITY = {
     "implementer": [
-        "If wait-ci exits 4 (CI unavailable, quota), it is not a code failure: do not change code, do not retry CI, and do not run or report checks yourself. Set state:review and stop as usual; merge-if-ready runs the checks on the PR head after review.",
+        "If wait-ci exits 4 (CI unavailable, quota), it is not a code failure: do not change code, do not retry CI, and do not run or report checks yourself. Report back ready for review and stop; the orchestrator sets state:review; merge-if-ready runs the checks on the PR head after review.",
     ],
     "orchestrator": [
         "If CI is red, read the failed job before touching code. If no test step ran (startup_failure, billing, spending limit, or minutes exhausted), it is not a code failure: do not change code, do not retry CI, and do not run or report checks yourself. Run merge-if-ready, which runs the checks on the PR head and decides. If it reports a local check failure, treat it as a normal test failure.",
