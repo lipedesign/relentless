@@ -14,19 +14,19 @@ You own the loop. Prefer spawning sub-agents over doing their jobs yourself.
 - **One writer per worktree** (`worktree-segura`). Never share a checkout across parallel implementers.
 
 ## State and workflow rules
-- **State ownership (C1):** Only you write issue/PR workflow state. Run `set-state.sh`, `fill-qa-section.sh`, `request-decision.sh`, `apply-review-verdict.sh`, merge labels, `human:pending`, and status comments. Workers deliver work and report back; they never write issue state.
-- **Claim (C1):** Before spawning an implementer, set `state:todo` → `state:in-progress` via `set-state.sh` and assign the worker.
-- **Context per role (C18):** Give the implementer the context a developer needs for the ticket, in a fixed structure — **AC**, **Files**, **ADRs**, **Out of scope** — not the full orchestrator thread. Keep the implementer's Report back only in the orchestrator session; never forward it to qa or the reviewer. Give qa and the reviewer the issue and its context (issue body, AC, linked ADRs, relevant discussion) so they can judge; never the implementer's reasoning, narrative, chat, or report.
-- **QA (C1, C5/F19, C13):** When the implementer reports ready, spawn a separate `qa` agent; the implementer never runs or writes QA. Put the qa report in the PR **body** with `fill-qa-section.sh` (patches the body by default), then `set-state.sh --state review` (label `state:review`).
-- **Verdict → resume or merge (C1):** You run `apply-review-verdict.sh`. On `changes_requested`, the issue returns to `state:in-progress` — resume the **same** worktree. On `approved`, proceed to `merge-if-ready` when mode allows (`merge:auto` per ADR 0003).
-- **Human gates (C19):** Wait for a human only for this closed list: ADR/`decide`; secrets or credentials; main branch ruleset/protection; publishing to a registry; any `state:blocked`; deleting branches or rewriting history. Outside this list, nobody waits for a human.
-- **Approval pinned to SHA (C20):** Before `merge-if-ready`, compare the PR head SHA (full `headRefOid`) with the SHA the latest `relentless:review-verdict` was given on. If the head changed, remove `review:approved` and run the isolated review again. merge-if-ready also enforces this.
-- **Follow-up Origem (C22):** Every follow-up issue you open (or that workers open under your wave) must include the literal line `Origem: achado durante <revisão|QA|CI> da PR #N`.
-- **Done / human gate (C1):** After a successful merge, set `state:done`. When a human decision is needed, run `request-decision.sh` (`human:pending` + `state:blocked`) with options (and a proposed ADR path when durable); never invent the decision.
-- **CI red log (C3):** On a real CI failure (`wait-ci` exit 1), read the failed job log and comment on the issue with the failing step, a short log tail, and the likely cause before resuming the implementer.
-- **Review bundle (C4/F17):** Pass the review bundle by file path or stdin. Never embed `$(cat bundle)` (or a huge blob) in reviewer argv.
-- **Preview PIDs (C7/F38):** When starting preview/dev servers, record the PID; on worktree cleanup kill that PID. Never `pkill -f` by process name.
-- **Codex edits (C6/F20):** Prefer Write/apply_patch over large shell heredocs when spawning or instructing Codex workers.
+- **State ownership:** Only you write issue/PR workflow state. Run `set-state.sh`, `fill-qa-section.sh`, `request-decision.sh`, `apply-review-verdict.sh`, merge labels, `human:pending`, and status comments. Workers deliver work and report back; they never write issue state.
+- **Claim:** Before spawning an implementer, set `state:todo` → `state:in-progress` via `set-state.sh` and assign the worker.
+- **Context per role:** Give the implementer the context a developer needs for the ticket, in a fixed structure — **AC**, **Files**, **ADRs**, **Out of scope** — not the full orchestrator thread. Keep the implementer's Report back only in the orchestrator session; never forward it to qa or the reviewer. Give qa and the reviewer the issue and its context (issue body, AC, linked ADRs, relevant discussion) so they can judge; never the implementer's reasoning, narrative, chat, or report.
+- **QA:** When the implementer reports ready, spawn a separate `qa` agent; the implementer never runs or writes QA. Put the qa report in the PR **body** with `fill-qa-section.sh` (patches the body by default), then `set-state.sh --state review` (label `state:review`).
+- **Verdict → resume or merge:** You run `apply-review-verdict.sh`. On `changes_requested`, the issue returns to `state:in-progress` — resume the **same** worktree. On `approved`, proceed to `merge-if-ready` when mode allows (`merge:auto` per ADR 0003).
+- **Human gates:** Wait for a human only for this closed list: ADR/`decide`; secrets or credentials; main branch ruleset/protection; publishing to a registry; any `state:blocked`; deleting branches or rewriting history. Outside this list, nobody waits for a human.
+- **Approval pinned to SHA:** Before `merge-if-ready`, compare the PR head SHA (full `headRefOid`) with the SHA the latest `relentless:review-verdict` was given on. If the head changed, remove `review:approved` and run the isolated review again. merge-if-ready also enforces this.
+- **Follow-up Origem:** Every follow-up issue you open (or that workers open under your wave) must include the literal line `Origem: achado durante <revisão|QA|CI> da PR #N`.
+- **Done / human gate:** After a successful merge, set `state:done`. When a human decision is needed, run `request-decision.sh` (`human:pending` + `state:blocked`) with options (and a proposed ADR path when durable); never invent the decision.
+- **CI red log:** On a real CI failure (`wait-ci` exit 1), read the failed job log and comment on the issue with the failing step, a short log tail, and the likely cause before resuming the implementer.
+- **Review bundle:** Pass the review bundle by file path or stdin. Never embed `$(cat bundle)` (or a huge blob) in reviewer argv.
+- **Preview PIDs:** When starting preview/dev servers, record the PID; on worktree cleanup kill that PID. Never `pkill -f` by process name.
+- **Codex edits:** Prefer Write/apply_patch over large shell heredocs when spawning or instructing Codex workers.
 
 ## Loop
 
@@ -34,12 +34,12 @@ You own the loop. Prefer spawning sub-agents over doing their jobs yourself.
 | --- | --- | --- |
 | Reconcile with GitHub (open PRs, `state:*`, branches, local worktrees) — never memory | orchestrator | — |
 | Claim `state:todo` → `state:in-progress`; create worktree (`worktree-create.sh`; push = lock) | orchestrator | git lock |
-| Spawn implementer with context a developer needs (C18: AC, Files, ADRs, Out of scope); implement AC; open PR; `wait-ci` foreground | implementer | local tests / wait-ci; report stays in orchestrator session (C18) |
+| Spawn implementer with context a developer needs (AC, Files, ADRs, Out of scope); implement AC; open PR; `wait-ci` foreground | implementer | local tests / wait-ci; report stays in orchestrator session |
 | `wait-ci` exit 4 (quota): not a code failure — after review, `merge-if-ready` runs local checks on the PR head | orchestrator | merge-if-ready local checks |
-| Spawn qa; put report in PR body (`fill-qa-section.sh`); `set-state` → `state:review` | orchestrator (+ qa) | Before reviewer (C13); issue context only — never implementer reasoning (C18) |
-| Isolated review via `run-isolated-review.sh` (bundle path/stdin; harness from config) | reviewer | Issue context only — never implementer reasoning (C18) |
+| Spawn qa; put report in PR body (`fill-qa-section.sh`); `set-state` → `state:review` | orchestrator (+ qa) | Before reviewer; issue context only — never implementer reasoning |
+| Isolated review via `run-isolated-review.sh` (bundle path/stdin; harness from config) | reviewer | Issue context only — never implementer reasoning |
 | Apply verdict: on `changes_requested` → resume **same** worktree; on `approved` → continue | orchestrator | Always same worktree |
-| On `approved` + `merge:auto`: pin approval to SHA (C20) — if `headRefOid` ≠ SHA on latest `relentless:review-verdict`, drop `review:approved` and re-run isolated review; else `merge-if-ready.sh` (ADR 0003); `--cleanup-worktree` when known | orchestrator | CI + `review:approved` + head SHA matches verdict (C20; enforced by merge-if-ready, C23) |
+| On `approved` + `merge:auto`: pin approval to SHA — if `headRefOid` ≠ SHA on latest `relentless:review-verdict`, drop `review:approved` and re-run isolated review; else `merge-if-ready.sh` (ADR 0003); `--cleanup-worktree` when known | orchestrator | CI + `review:approved` + head SHA matches verdict (enforced by merge-if-ready) |
 | After merge → `state:done`; milestone close → spawn documenter (`write-status-snapshot.sh`) | orchestrator (+ documenter) | — |
 
 - If CI is red, read the failed job before touching code. If no test step ran (startup_failure, billing, spending limit, or minutes exhausted), it is not a code failure: do not change code, do not retry CI, and do not run or report checks yourself. Run merge-if-ready, which runs the checks on the PR head and decides. If it reports a local check failure, treat it as a normal test failure.

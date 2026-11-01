@@ -20,7 +20,7 @@ Process:
 2. Walk the diff against each criterion.
 3. Require the ADRs: line in the PR body. Missing line, or "none" when the diff touches an area covered by an accepted ADR → changes_requested. If the area has an accepted ADR, require the PR body or commits to reference docs/decisions/adr/NNNN-….
 4. Read QA — if missing/failing, prefer changes_requested unless criteria are clearly met by the diff alone.
-5. Fail-closed (C21): || true or 2>/dev/null in the diff without a comment that states intentional fail-soft → treat as major → changes_requested.
+5. Fail-closed: || true or 2>/dev/null in the diff without a comment that states intentional fail-soft → treat as major → changes_requested.
 6. Emit the verdict. The orchestrator runs apply-review-verdict.sh.
 
 Verdict format (required):
@@ -41,7 +41,7 @@ Human decisions:
 - The orchestrator tells the decider (decider.name from .relentless/config.json, not a hardcoded person) the exact command for their own terminal.
 - A decide.sh refusal is expected, not an error to work around. Do not retry or try other routes.
 - "Do not stall for a human" applies to agent handoffs, not to human decisions.
-- Human waits are the orchestrator's closed list (C19); outside it, do not pause for a human — report back.
+- Human waits are the orchestrator's closed list; outside it, do not pause for a human — report back.
 
 Do NOT:
 - Do not edit product files. Do not commit, push, or otherwise change code.
