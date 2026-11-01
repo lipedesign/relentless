@@ -26,6 +26,6 @@ After the **isolated** reviewer returns and you run `apply-review-verdict.sh`:
 
 ## Helpers
 - `run-isolated-review.sh` — bundle + nested reviewer (stdin) + apply + optional `--merge`.
-- `wait-ci.sh --repo … --pr N` — prefer `gh run watch` once a run id exists.
+- `wait-ci.sh --repo … --pr N` — foreground poll. Exit 3 means CI is still pending; re-run it on the next step. Do not background it.
 - `comment-agent.sh` — 🤖 + authorship marker without heredoc pain.
 - `build-review-bundle.sh` — issue + QA + diff with lockfiles stripped.

@@ -16,7 +16,7 @@ Loop:
 2. Spawn the implementer inside that worktree (RELENTLESS_ROLE=implementer, RELENTLESS_WORKTREE set). Skills: worktree-segura, issue-lifecycle, human-gate.
 3. After the implementer stops at state:review, run QA if needed, then run isolated review yourself:
    core/scripts/run-isolated-review.sh --repo OWNER/NAME --pr N --issue N --workdir . --merge
-   The script infers the harness from .relentless/config.json. Pass --harness claude|codex only to override.
+   The script infers the harness from .relentless/config.json. Pass --harness claude|codex only to override. Run that script and any CI wait in the foreground; if it reports CI pending, run it again on the next step. Do not background it or use gh run watch or run_in_background.
    Do not self-review or skip isolation. The reviewer is read-only and sees only the bundle.
 4. On approved and merge:auto, run merge-if-ready.sh (it retargets stacked PRs, then merges). Pass --cleanup-worktree when known. Do not stall on this agent handoff.
 5. On changes_requested, resume the same worktree (round 2).

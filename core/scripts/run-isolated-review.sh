@@ -54,6 +54,7 @@ VERDICT_RAW="${OUT_DIR}/reviewer-out.md"
 VERDICT_FILE="${OUT_DIR}/verdict.txt"
 
 echo "== isolated review (harness=$HARNESS) PR #$PR issue #$ISSUE =="
+echo "foreground: reviewer runs in this process until it exits; do not background it"
 
 "${SCRIPT_DIR}/build-review-bundle.sh" --repo "$REPO" --pr "$PR" --issue "$ISSUE" --out "$BUNDLE"
 echo "bundle: $BUNDLE ($(wc -c <"$BUNDLE") bytes)"
@@ -68,9 +69,16 @@ PROMPT_FILE="${OUT_DIR}/reviewer-prompt.md"
 
 if [[ "$DRY" -eq 1 ]]; then
   echo "dry-run: would spawn $HARNESS reviewer with stdin from $PROMPT_FILE"
+  echo "dry-run: would export RELENTLESS_ROLE=reviewer CLAUDE_AGENT=reviewer"
   echo "dry-run: then apply-review-verdict + $([ "$MERGE" -eq 1 ] && echo merge-if-ready || echo 'no --merge')"
   exit 0
 fi
+
+# Isolation hooks (pretool-reviewer-isolation.sh, pretool-gh-workflow.sh) read
+# these names. Export before every spawn so the reviewer process, its Claude
+# fallback, the Codex spawn, and anything the reviewer itself spawns inherit them.
+export RELENTLESS_ROLE=reviewer
+export CLAUDE_AGENT=reviewer
 
 # Pass bundle via stdin/file — NEVER "$(cat bundle)" as argv (fails on large diffs).
 case "$HARNESS" in
@@ -100,7 +108,7 @@ case "$HARNESS" in
     ;;
   codex)
     # Prefer Write/apply_patch inside nested sessions; avoid huge shell heredocs (Codex classifier false positives).
-    RELENTLESS_ROLE=reviewer codex exec \
+    codex exec \
       --sandbox read-only \
       -C "$WORKDIR" \
       < "$PROMPT_FILE" \

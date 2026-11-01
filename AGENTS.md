@@ -88,9 +88,9 @@ Or manually:
 
 1. `build-review-bundle.sh … --out review-bundle.md` (lockfiles excluded)
 2. **Pass the bundle via stdin / file — never `$(cat bundle)` as argv** (large diffs fail):
-   - Claude: `claude -p --agent relentless:reviewer --verbose --output-format stream-json < review-bundle.md`
-     (`--output-format stream-json` **requires** `--verbose` on Claude Code 2.1.x+)
-   - Codex: `codex exec --sandbox read-only -C . < review-bundle.md`
+   - Claude: `RELENTLESS_ROLE=reviewer CLAUDE_AGENT=reviewer claude -p --agent relentless:reviewer --verbose --output-format stream-json < review-bundle.md`
+     (`--output-format stream-json` **requires** `--verbose` on Claude Code 2.1.x+). `run-isolated-review.sh` exports both names before the Claude spawn, its fallback spawn, and the Codex spawn, so `pretool-reviewer-isolation.sh` sees them on anything the reviewer starts.
+   - Codex: `RELENTLESS_ROLE=reviewer CLAUDE_AGENT=reviewer codex exec --sandbox read-only -C . < review-bundle.md`
      (Prefer Write/apply_patch inside nested sessions; huge `cat <<EOF` heredocs can false-positive Codex shell classifiers.)
 3. `apply-review-verdict.sh … --verdict approved|changes_requested`
 4. If approved → **immediately** `merge-if-ready.sh` (do not stall on the agent handoff; a `human:pending` decision is not this handoff)
@@ -107,7 +107,7 @@ core/scripts/merge-if-ready.sh --repo OWNER/NAME --pr N --issue N
 - `merge:auto` / config default `auto`: CI green on head SHA + `review:approved` → retarget open PRs stacked on the head branch → **merge commit** (`gh pr merge --merge`) → delete branch only if safe → `state:done` → close issue
 - `merge:human`: post 🤖 ready-to-merge and wait
 
-CI wait: prefer `wait-ci.sh` / `gh run watch` after a run id exists (avoids `gh pr checks` "no checks reported" race).
+CI wait: `wait-ci.sh` polls in the foreground (exit 3 means pending — re-run it on the next step). Do not background it or use `gh run watch`.
 
 ## Merge policy
 - Default: `.relentless/config.json` → `merge.default` (`auto` | `human`)
@@ -164,7 +164,7 @@ Stack detection writes real `relentless-ci.yml` (or FAIL-closed if no test). Ups
 - Skill `worktree-segura`; scripts `worktree-create.sh` / `worktree-cleanup.sh`.
 - Branch `<type>/<n>-<slug>` from fresh `origin/main` only. Remote push = lock.
 - Hooks: `pretool-protect-main`, `pretool-protect-worktree-write`, `stop-gate` (Claude). Codex: honor the same rules in agent briefs / AGENTS (no Stop hooks).
-- Consumer git hooks (`.relentless/githooks`, via `core.hooksPath` or chained onto husky) refuse commits and pushes to main/master and force-pushes. GitHub branch protection stays off unless setup was explicitly told yes.
+- Consumer git hooks (`.relentless/githooks`, via `core.hooksPath` or chained onto husky) refuse commits and pushes to main/master and force-pushes. On Codex without a sandbox those hooks are advisory, since an agent can bypass them with `git push --no-verify` or `git -c core.hooksPath=/dev/null ...`, so branch protection is the only hard lock on `main` there. GitHub branch protection stays off unless setup was explicitly told yes.
 
 ## Conventional commits (PR10)
 - Subject: `type(scope)?: description` with standard types.
@@ -185,7 +185,7 @@ Project scripts must not swallow errors with bare `|| true` / redirected-away st
 `orchestrator` (session driver), `planner`, `implementer`, `reviewer`, `qa`, `documenter` — Claude `agents/*.md` + Codex `.codex/agents/*.toml`.
 
 ## Stop / protect hooks
-- `stop-gate.sh`: block end-of-turn with dirty worktree; `state:in-progress` without pushed branch/PR; open PR without `## QA` section.
+- `stop-gate.sh`: exit 0 when stdin `stop_hook_active` is true (no loop). Otherwise block end-of-turn with a dirty worktree; failing project tests (`checks.test`, else `npm test` when `package.json` has `scripts.test`; skip when there is no command); `state:in-progress` without pushed branch/PR; open PR without `## QA` section.
 - `pretool-protect-main.sh`: no commit/push on main (including `git -C` / `cd` onto another checkout); no force-push (`-f`, `--force`, `--force-with-lease`, `+refspec`) / reset --hard / clean -f.
 - `pretool-gh-workflow.sh`: an agent role cannot invoke `decide.sh`, `accept-adr.sh`, or `new-adr.sh --status accepted`.
 - Run `bash tests/hooks/test-hooks.sh`, `tests/hooks/test-decide-guard.sh`, and `tests/hooks/test-githooks.sh`.

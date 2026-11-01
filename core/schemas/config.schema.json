@@ -101,7 +101,8 @@
           "type": "string"
         },
         "test": {
-          "type": "string"
+          "type": "string",
+          "description": "Project test command (also written into relentless-ci.yml). stop-gate.sh runs this before a turn may end. Empty falls back to npm test when package.json scripts.test is set; no command skips that gate."
         },
         "build": {
           "type": "string"
