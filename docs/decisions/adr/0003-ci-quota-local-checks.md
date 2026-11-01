@@ -2,7 +2,7 @@
 
 - **Status:** proposed
 - **Date:** 2026-10-31 (America/Sao_Paulo)
-- **Issue:** (none)
+- **Issue:** #16
 - **Human gate:** required (`human:pending` → `/decide`)
 - **Decided by:** _(filled by `/decide`)_
 
@@ -11,7 +11,7 @@ Private and organization repositories have GitHub Actions minute limits. When th
 
 `wait-ci.sh` exits 4 with `CI unavailable (quota)` and does not retry. Only `merge-if-ready.sh` may then run `checks.install`, `checks.lint`, `checks.typecheck`, `checks.test`, and `checks.build` in a clean worktree at the PR head. It posts `<!-- relentless:local-checks -->`, applies `ci:local`, and re-reads the head SHA before merging. A real test failure stays exit 1 and does not take this path. If `checks.test` resolves to nothing, it labels `human:pending` and does not merge. `merge:human` still waits.
 
-A self-hosted runner is how to keep real Actions CI. The rule in Decision is the owner's selection. This record stays proposed until the decider accepts it.
+A self-hosted runner is how to keep real Actions CI. The rule in Decision is the owner's selection. This record stays proposed until the decider accepts it on issue #16 (https://github.com/marcelusfernandes/relentless/issues/16), which is the linked issue for PR #15.
 
 ## Options
 
