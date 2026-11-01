@@ -106,21 +106,6 @@
       "description": "Requires skeptical validation before permanent implementation; outcome is a decision or follow-up..."
     },
     {
-      "name": "independence:I1",
-      "color": "BFD4F2",
-      "description": "Sequence dependency: must follow prerequisite work"
-    },
-    {
-      "name": "independence:I2",
-      "color": "C5DEF5",
-      "description": "Some coupling or likely file overlap"
-    },
-    {
-      "name": "independence:I3",
-      "color": "0E8A16",
-      "description": "Highly independent; suitable for parallel work"
-    },
-    {
       "name": "severity:critical",
       "color": "B60205",
       "description": "Critical review finding severity; does not set roadmap order"
